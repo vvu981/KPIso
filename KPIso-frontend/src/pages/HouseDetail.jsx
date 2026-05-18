@@ -8,10 +8,10 @@ import { Badge } from '../components/ui/Badge.jsx';
 import { Alert } from '../components/ui/Alert.jsx';
 import { Input } from '../components/ui/Input.jsx';
 import { PageLoader } from '../components/layout/PageLoader.jsx';
-import { 
-    IconClipboardDocumentList, IconBanknotes, IconMagnifyingGlass, 
-    IconCalendar, IconListBullet, IconCheck, IconXMark, 
-    IconPlus, IconReceiptRefund 
+import {
+    IconClipboardDocumentList, IconBanknotes, IconMagnifyingGlass,
+    IconCalendar, IconListBullet, IconCheck, IconXMark,
+    IconPlus, IconReceiptRefund
 } from '../components/ui/Icons.jsx';
 
 // ── SVG Icons (Heroicons outline) ───────────────────────────────────────
@@ -72,21 +72,11 @@ const IconChevronLeft = () => (
 
 /**
  * HouseDetail — Página de detalle y gestión de vivienda
- *
- * Funcionalidades:
- * - Vista de deberes (tareas) con calendario
- * - Gestión de gastos y liquidaciones
- * - Log de transparencia
- * - Gestión de miembros
- * - Configuración de vivienda
- *
- * Principio S: coordina subcomponentes especializados
- * Principio D: inyecta datos y callbacks como props
  */
 export default function HouseDetail() {
     const { houseId } = useParams();
     const authContext = useContext(AuthContext);
-    const { userId: currentUserId = null } = authContext || {};
+    const { userId: currentUserId = null, token = null, username: currentUsername = null } = authContext || {};
     const navigate = useNavigate();
 
     // Estado global de datos
@@ -133,6 +123,10 @@ export default function HouseDetail() {
 
     const [showEditHouseModal, setShowEditHouseModal] = useState(false);
     const [editHouseForm, setEditHouseForm] = useState({ name: '', profilePictureUrl: '' });
+
+    // Modales de Perfil de Usuario
+    const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+    const [profileFormData, setProfileFormData] = useState({ username: '', profilePictureUrl: '' });
 
     // Diálogos personalizados
     const [customDialog, setCustomDialog] = useState({
@@ -202,6 +196,28 @@ export default function HouseDetail() {
         }
     };
 
+    /**
+     * Guardar cambios del perfil de usuario y sincronizar el contexto global
+     */
+    const handleUpdateProfile = async (e) => {
+        e.preventDefault();
+        try {
+            await api.put(`/users/${currentUserId}`, {
+                username: profileFormData.username,
+                profilePictureUrl: profileFormData.profilePictureUrl,
+            });
+
+            if (authContext && authContext.loginUser) {
+                authContext.loginUser(token, currentUserId, profileFormData.username);
+            }
+
+            setShowEditProfileModal(false);
+            fetchData();
+        } catch (err) {
+            showAlert('No se pudieron guardar los cambios de tu perfil de usuario.');
+        }
+    };
+
     // Handlers para tareas
     const handleCreateOrUpdateTask = async (e) => {
         e.preventDefault();
@@ -257,7 +273,7 @@ export default function HouseDetail() {
     const handleToggleTaskStatus = async (taskId, currentStatus) => {
         try {
             const newStatus = currentStatus === 'PENDING' ? 'COMPLETED' : 'PENDING';
-            await api.patch(`/tasks/${taskId}/status?status=${newStatus}`);
+            await api.patch(`/tasks/${taskId}/status?status=${newStatus}&userId=${currentUserId}`);
             fetchData();
         } catch (err) {
             showAlert('No se pudo actualizar el estado de la tarea.');
@@ -483,6 +499,13 @@ export default function HouseDetail() {
                         currentUserId={currentUserId}
                         isAdmin={selfIsAdmin}
                         onColorChange={handleColorChange}
+                        onEditProfile={() => {
+                            setProfileFormData({
+                                username: currentUsername || '',
+                                profilePictureUrl: '',
+                            });
+                            setShowEditProfileModal(true);
+                        }}
                     />
                 </aside>
 
@@ -555,6 +578,15 @@ export default function HouseDetail() {
                     onFormChange={setEditHouseForm}
                     onSubmit={handleUpdateHouse}
                     onClose={() => setShowEditHouseModal(false)}
+                />
+            )}
+
+            {showEditProfileModal && (
+                <EditProfileModal
+                    form={profileFormData}
+                    onFormChange={setProfileFormData}
+                    onSubmit={handleUpdateProfile}
+                    onClose={() => setShowEditProfileModal(false)}
                 />
             )}
 
@@ -683,7 +715,6 @@ function HouseDetailHeader({ house, activeTab, onTabChange, onEditClick, onDelet
                 </div>
             </div>
 
-            {/* Tabs de navegación */}
             <div
                 style={{
                     display: 'flex',
@@ -727,15 +758,16 @@ function HouseDetailHeader({ house, activeTab, onTabChange, onEditClick, onDelet
  * HouseSidebar — Panel lateral con miembros e información
  */
 function HouseSidebar({
-    members,
-    memberStatuses,
-    sidebarView,
-    onSidebarViewChange,
-    onRemoveMember,
-    currentUserId,
-    isAdmin,
-    onColorChange,
-}) {
+                          members,
+                          memberStatuses,
+                          sidebarView,
+                          onSidebarViewChange,
+                          onRemoveMember,
+                          currentUserId,
+                          isAdmin,
+                          onColorChange,
+                          onEditProfile,
+                      }) {
     return (
         <Card padding="lg" glass>
             <h2 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-bold)', color: 'var(--text-secondary)', marginBottom: 'var(--space-3)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
@@ -810,12 +842,21 @@ function HouseSidebar({
                                     {status.balance > 0 && sidebarView === 'money' ? '+' : ''}{value}
                                 </span>
                                 {member.userId === currentUserId && (
-                                    <input 
-                                        type="color" 
-                                        value={status.color} 
-                                        onChange={(e) => onColorChange(e.target.value)} 
-                                        style={{ width: 18, height: 18, border: 'none', borderRadius: '4px', cursor: 'pointer', backgroundColor: 'transparent' }} 
-                                    />
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+                                        <input
+                                            type="color"
+                                            value={status.color}
+                                            onChange={(e) => onColorChange(e.target.value)}
+                                            style={{ width: 18, height: 18, border: 'none', borderRadius: '4px', cursor: 'pointer', backgroundColor: 'transparent' }}
+                                        />
+                                        <button
+                                            onClick={onEditProfile}
+                                            title="Editar mi perfil"
+                                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', color: 'var(--text-secondary)' }}
+                                        >
+                                            <IconPencil />
+                                        </button>
+                                    </div>
                                 )}
                                 {isAdmin && member.userId !== currentUserId && (
                                     <Button
@@ -841,32 +882,37 @@ function HouseSidebar({
  * TasksSection — Sección de gestión de deberes/tareas
  */
 function TasksSection({
-    tasks,
-    house,
-    showTaskForm,
-    editingTaskId,
-    taskForm,
-    onTaskFormChange,
-    onSubmitTask,
-    onCancelTask,
-    onAddTask,
-    onEditTask,
-    onDeleteTask,
-    onToggleStatus,
-    onDragStart,
-    onDropTask,
-    selectedTask,
-    onSelectTask,
-    taskViewMode,
-    onTaskViewModeChange,
-    currentMonth,
-    currentYear,
-    onPrevMonth,
-    onNextMonth,
-}) {
+                          tasks,
+                          house,
+                          showTaskForm,
+                          editingTaskId,
+                          taskForm,
+                          onTaskFormChange,
+                          onSubmitTask,
+                          onCancelTask,
+                          onAddTask,
+                          onEditTask,
+                          onDeleteTask,
+                          onToggleStatus,
+                          onDragStart,
+                          onDropTask,
+                          selectedTask,
+                          onSelectTask,
+                          taskViewMode,
+                          onTaskViewModeChange,
+                          currentMonth,
+                          currentYear,
+                          onPrevMonth,
+                          onNextMonth,
+                      }) {
+    const now = new Date();
+
     const isTaskInCurrentPeriod = (task) => {
+        // MODIFICADO (REGLA DE LIGA): Si la tarea está pendiente y va retrasada, DEBE mostrarse siempre en la lista como rescatable
+        if (task.status === 'PENDING' && task.dueDate && new Date(task.dueDate) < now) {
+            return true;
+        }
         if (!task.dueDate) return true;
-        const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const taskDay = new Date(new Date(task.dueDate).getFullYear(), new Date(task.dueDate).getMonth(), new Date(task.dueDate).getDate());
 
@@ -899,9 +945,9 @@ function TasksSection({
         <Card padding="lg">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-6)' }}>
                 <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--font-bold)' }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <IconClipboardDocumentList /> Deberes & Tareas
-                        </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <IconClipboardDocumentList /> Deberes & Tareas
+                    </span>
                 </h2>
                 {!showTaskForm && (
                     <Button variant="primary" size="sm" onClick={onAddTask}>
@@ -946,25 +992,29 @@ function TasksSection({
                 !showTaskForm && (
                     taskViewMode === 'list' ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                            {tasks.filter(isTaskInCurrentPeriod).map((task) => (
-                                <TaskListItem
-                                    key={task.id}
-                                    task={task}
-                                    onSelect={() => onSelectTask(task)}
-                                    onEdit={() => onEditTask(task)}
-                                    onDelete={() => onDeleteTask(task.id)}
-                                    onToggleStatus={() => onToggleStatus(task.id, task.status)}
-                                />
-                            ))}
+                            {tasks.filter(isTaskInCurrentPeriod).map((task) => {
+                                const isExpired = task.status === 'PENDING' && task.dueDate && new Date(task.dueDate) < now;
+                                return (
+                                    <TaskListItem
+                                        key={task.id}
+                                        task={task}
+                                        isExpired={isExpired}
+                                        onSelect={() => onSelectTask(task)}
+                                        onEdit={() => onEditTask(task)}
+                                        onDelete={() => onDeleteTask(task.id)}
+                                        onToggleStatus={() => onToggleStatus(task.id, task.status)}
+                                    />
+                                );
+                            })}
                         </div>
                     ) : (
                         <div style={{ userSelect: 'none' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)', backgroundColor: 'var(--bg-elevated)', padding: 'var(--space-2)', borderRadius: 'var(--radius-xl)', border: '1px solid var(--border-subtle)' }}>
                                 <Button variant="secondary" size="sm" onClick={onPrevMonth}>◀</Button>
                                 <h3 style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-black)', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>
-                                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <IconCalendar /> {new Date(currentYear, currentMonth).toLocaleString('es-ES', { month: 'long', year: 'numeric' })}
-                                        </span>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <IconCalendar /> {new Date(currentYear, currentMonth).toLocaleString('es-ES', { month: 'long', year: 'numeric' })}
+                                    </span>
                                 </h3>
                                 <Button variant="secondary" size="sm" onClick={onNextMonth}>▶</Button>
                             </div>
@@ -978,38 +1028,43 @@ function TasksSection({
                                     const dateStr = dayDate.toDateString();
                                     const dayTasks = tasks.filter(t => t.dueDate && new Date(t.dueDate).toDateString() === dateStr);
                                     return (
-                                        <div 
-                                            key={dateStr} 
-                                            onDragOver={e => e.preventDefault()} 
-                                            onDrop={e => onDropTask(e, dayDate.toISOString())} 
+                                        <div
+                                            key={dateStr}
+                                            onDragOver={e => e.preventDefault()}
+                                            onDrop={e => onDropTask(e, dayDate.toISOString())}
                                             style={{ minHeight: '80px', backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', p: '2px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}
                                         >
                                             <span style={{ fontSize: '9px', fontWeight: 'bold', color: 'var(--text-tertiary)', padding: '2px' }}>{dayDate.getDate()}</span>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
-                                                {dayTasks.map(task => (
-                                                    <div 
-                                                        key={task.id} 
-                                                        draggable={task.status === 'PENDING'} 
-                                                        onDragStart={e => onDragStart(e, task.id)} 
-                                                        onClick={(e) => { e.stopPropagation(); onSelectTask(task); }} 
-                                                        style={{ 
-                                                            fontSize: '9px', 
-                                                            fontWeight: 'bold', 
-                                                            padding: '2px 4px', 
-                                                            borderRadius: 'var(--radius-sm)', 
-                                                            textOverflow: 'ellipsis', 
-                                                            overflow: 'hidden', 
-                                                            whiteSpace: 'nowrap',
-                                                            borderLeft: `3px solid ${task.assignedTo?.color || 'var(--accent)'}`,
-                                                            backgroundColor: task.status === 'COMPLETED' ? 'var(--border-subtle)' : 'var(--bg-elevated)',
-                                                            color: task.status === 'COMPLETED' ? 'var(--text-tertiary)' : 'var(--text-primary)',
-                                                            textDecoration: task.status === 'COMPLETED' ? 'line-through' : 'none',
-                                                            cursor: 'pointer'
-                                                        }}
-                                                    >
-                                                        {task.status === 'COMPLETED' && <span style={{ color: 'var(--success)', marginRight: '4px' }}><IconCheck /></span>}{task.title}
-                                                    </div>
-                                                ))}
+                                                {dayTasks.map(task => {
+                                                    const isExpired = task.status === 'PENDING' && task.dueDate && new Date(task.dueDate) < now;
+                                                    return (
+                                                        <div
+                                                            key={task.id}
+                                                            draggable={task.status === 'PENDING'}
+                                                            onDragStart={e => onDragStart(e, task.id)}
+                                                            onClick={(e) => { e.stopPropagation(); onSelectTask(task); }}
+                                                            style={{
+                                                                fontSize: '9px',
+                                                                fontWeight: 'bold',
+                                                                padding: '2px 4px',
+                                                                borderRadius: 'var(--radius-sm)',
+                                                                textOverflow: 'ellipsis',
+                                                                overflow: 'hidden',
+                                                                whiteSpace: 'nowrap',
+                                                                borderLeft: `3px solid ${isExpired ? 'var(--danger)' : (task.assignedTo?.color || 'var(--accent)')}`,
+                                                                backgroundColor: task.status === 'COMPLETED' ? 'var(--border-subtle)' : (isExpired ? '#fef2f2' : 'var(--bg-elevated)'),
+                                                                color: task.status === 'COMPLETED' ? 'var(--text-tertiary)' : (isExpired ? 'var(--danger)' : 'var(--text-primary)'),
+                                                                textDecoration: task.status === 'COMPLETED' ? 'line-through' : 'none',
+                                                                cursor: 'pointer'
+                                                            }}
+                                                            title={isExpired ? "¡Rescate disponible! Esta tarea ha expirado." : ""}
+                                                        >
+                                                            {task.status === 'COMPLETED' && <span style={{ color: 'var(--success)', marginRight: '4px' }}><IconCheck /></span>}
+                                                            {isExpired && '🚨 '}{task.title}
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                         </div>
                                     );
@@ -1026,16 +1081,16 @@ function TasksSection({
 /**
  * TaskListItem — Componente individual para tarea en lista
  */
-function TaskListItem({ task, onSelect, onEdit, onDelete, onToggleStatus }) {
+function TaskListItem({ task, isExpired, onSelect, onEdit, onDelete, onToggleStatus }) {
     return (
         <div
             onClick={onSelect}
             style={{
                 padding: 'var(--space-4)',
                 borderRadius: 'var(--radius-lg)',
-                backgroundColor: 'var(--bg-elevated)',
+                backgroundColor: isExpired ? '#fef2f2' : 'var(--bg-elevated)',
                 border: '1px solid var(--border-subtle)',
-                borderLeft: `4px solid ${task.assignedTo?.color || 'var(--border-default)'}`,
+                borderLeft: `4px solid ${isExpired ? 'var(--danger)' : (task.assignedTo?.color || 'var(--border-default)')}`,
                 cursor: 'pointer',
                 transition: 'all 200ms var(--timing-smooth)',
                 opacity: task.status === 'COMPLETED' ? 0.6 : 1,
@@ -1047,27 +1102,28 @@ function TaskListItem({ task, onSelect, onEdit, onDelete, onToggleStatus }) {
                         style={{
                             fontSize: 'var(--text-base)',
                             fontWeight: 'var(--font-bold)',
-                            color: 'var(--text-primary)',
+                            color: isExpired ? 'var(--danger)' : 'var(--text-primary)',
                             textDecoration: task.status === 'COMPLETED' ? 'line-through' : 'none',
                         }}
                     >
                         {task.status === 'COMPLETED' && <span style={{ color: 'var(--success)', marginRight: 'var(--space-2)' }}><IconCheck /></span>}
                         {task.title}
+                        {isExpired && <span style={{ fontSize: '10px', fontWeight: 'black', marginLeft: 'var(--space-2)', color: 'var(--danger)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🚨 Rescate disponible (-{task.points} pts)</span>}
                     </h4>
-                    <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', marginTop: 'var(--space-1)' }}>
+                    <p style={{ fontSize: 'var(--text-xs)', color: isExpired ? 'var(--danger)' : 'var(--text-secondary)', marginTop: 'var(--space-1)', opacity: isExpired ? 0.8 : 1 }}>
                         Responsable: {task.assignedTo?.username || 'Cualquiera'} | {task.points} 🪙 KPI
                     </p>
                 </div>
                 <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
                     <Button
-                        variant="secondary"
+                        variant={isExpired ? 'danger' : 'secondary'}
                         size="sm"
                         onClick={(e) => {
                             e.stopPropagation();
                             onToggleStatus();
                         }}
                     >
-                        {task.status === 'PENDING' ? <><IconCheck /> Hecho</> : <><IconXMark /> Reabrir</>}
+                        {task.status === 'PENDING' ? (isExpired ? '⚡ Rescatar' : <><IconCheck /> Hecho</>) : <><IconXMark /> Reabrir</>}
                     </Button>
                     <Button
                         variant="secondary"
@@ -1100,8 +1156,8 @@ function TaskListItem({ task, onSelect, onEdit, onDelete, onToggleStatus }) {
  */
 function TaskForm({ form, onFormChange, onSubmit, onCancel, isEditing, house }) {
     const toggleDay = (dayNum) => {
-        const updated = form.specificDays.includes(dayNum) 
-            ? form.specificDays.filter(d => d !== dayNum) 
+        const updated = form.specificDays.includes(dayNum)
+            ? form.specificDays.filter(d => d !== dayNum)
             : [...form.specificDays, dayNum];
         onFormChange({ ...form, specificDays: updated });
     };
@@ -1144,8 +1200,8 @@ function TaskForm({ form, onFormChange, onSubmit, onCancel, isEditing, house }) 
                 <>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
                         <label style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-bold)', color: 'var(--text-secondary)' }}>Frecuencia / Tipo</label>
-                        <select 
-                            value={form.rotationType} 
+                        <select
+                            value={form.rotationType}
                             onChange={(e) => onFormChange({ ...form, rotationType: e.target.value, specificDays: [], participantIds: [] })}
                             style={{ padding: 'var(--space-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', fontSize: 'var(--text-sm)', backgroundColor: 'var(--bg-base)' }}
                         >
@@ -1171,11 +1227,11 @@ function TaskForm({ form, onFormChange, onSubmit, onCancel, isEditing, house }) 
                             <span style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', color: 'var(--text-tertiary)', marginBottom: 'var(--space-2)', textTransform: 'uppercase' }}>Selecciona los días específicos:</span>
                             <div style={{ display: 'flex', gap: '4px' }}>
                                 {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((d, i) => (
-                                    <button 
-                                        key={i} 
-                                        type="button" 
-                                        onClick={() => toggleDay(i + 1)} 
-                                        style={{ 
+                                    <button
+                                        key={i}
+                                        type="button"
+                                        onClick={() => toggleDay(i + 1)}
+                                        style={{
                                             width: 32, height: 32, borderRadius: 'var(--radius-md)', fontWeight: 'bold', fontSize: '11px', border: '1px solid var(--border-default)', cursor: 'pointer',
                                             backgroundColor: form.specificDays.includes(i + 1) ? 'var(--accent)' : 'var(--bg-elevated)',
                                             color: form.specificDays.includes(i + 1) ? '#fff' : 'var(--text-primary)'
@@ -1191,9 +1247,9 @@ function TaskForm({ form, onFormChange, onSubmit, onCancel, isEditing, house }) 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                         <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-bold)', color: 'var(--text-secondary)' }}>Distribución de Responsabilidades</span>
                         {form.rotationType === 'FIXED' ? (
-                            <select 
-                                required 
-                                value={form.assignedToId} 
+                            <select
+                                required
+                                value={form.assignedToId}
                                 onChange={(e) => onFormChange({ ...form, assignedToId: e.target.value })}
                                 style={{ padding: 'var(--space-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', fontSize: 'var(--text-sm)', backgroundColor: 'var(--bg-base)' }}
                             >
@@ -1216,8 +1272,8 @@ function TaskForm({ form, onFormChange, onSubmit, onCancel, isEditing, house }) 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)', padding: 'var(--space-3)', backgroundColor: 'var(--bg-base)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
                         <label style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Asignado actual</label>
-                        <select 
-                            value={form.assignedToId} 
+                        <select
+                            value={form.assignedToId}
                             onChange={(e) => onFormChange({ ...form, assignedToId: e.target.value })}
                             style={{ padding: 'var(--space-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', fontSize: 'var(--text-sm)', backgroundColor: 'var(--bg-base)' }}
                         >
@@ -1248,19 +1304,19 @@ function TaskForm({ form, onFormChange, onSubmit, onCancel, isEditing, house }) 
  * ExpensesSection — Sección de gestión de gastos
  */
 function ExpensesSection({
-    expenses,
-    settlements,
-    memberStatuses,
-    house,
-    showExpenseForm,
-    expenseForm,
-    onSubmitExpense,
-    onCancelExpense,
-    onAddExpense,
-    onSettlePayment,
-    setExpenseForm,
-    currentUserId,
-}) {
+                             expenses,
+                             settlements,
+                             memberStatuses,
+                             house,
+                             showExpenseForm,
+                             expenseForm,
+                             onSubmitExpense,
+                             onCancelExpense,
+                             onAddExpense,
+                             onSettlePayment,
+                             setExpenseForm,
+                             currentUserId,
+                         }) {
     const toggleBeneficiary = (id) => {
         const updated = expenseForm.participantIds.includes(id)
             ? expenseForm.participantIds.filter(p => p !== id)
@@ -1474,6 +1530,60 @@ function EditHouseModal({ house, form, onFormChange, onSubmit, onClose }) {
                         </Button>
                         <Button variant="primary" size="md" type="submit" full>
                             Guardar
+                        </Button>
+                    </div>
+                </form>
+            </Card>
+        </div>
+    );
+}
+
+/**
+ * EditProfileModal — Modal especializado para la mutación de datos de usuario
+ */
+function EditProfileModal({ form, onFormChange, onSubmit, onClose }) {
+    return (
+        <div
+            style={{
+                position: 'fixed',
+                inset: 0,
+                backgroundColor: 'rgba(0,0,0,0.5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 1200,
+                padding: 'var(--space-4)',
+            }}
+        >
+            <Card padding="lg" style={{ maxWidth: '400px', width: '100%' }}>
+                <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--font-bold)', marginBottom: 'var(--space-4)' }}>
+                    Editar Mi Perfil
+                </h2>
+                <form
+                    onSubmit={onSubmit}
+                    style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}
+                >
+                    <Input
+                        id="edit-profile-username"
+                        label="Nuevo Nombre de Usuario"
+                        type="text"
+                        required
+                        value={form.username}
+                        onChange={(e) => onFormChange({ ...form, username: e.target.value })}
+                    />
+                    <Input
+                        id="edit-profile-pic"
+                        label="URL de mi Foto de Perfil"
+                        type="text"
+                        value={form.profilePictureUrl}
+                        onChange={(e) => onFormChange({ ...form, profilePictureUrl: e.target.value })}
+                    />
+                    <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
+                        <Button variant="secondary" size="md" type="button" onClick={onClose} full>
+                            Cancelar
+                        </Button>
+                        <Button variant="primary" size="md" type="submit" full>
+                            Guardar Perfil
                         </Button>
                     </div>
                 </form>

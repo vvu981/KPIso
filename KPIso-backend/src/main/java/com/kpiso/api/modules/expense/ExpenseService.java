@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -44,29 +45,19 @@ public class ExpenseService {
                 .orElseThrow(() -> new IllegalArgumentException("El usuario pagador no existe"));
 
         List<User> participants = userRepository.findAllById(request.getParticipantIds());
-        if (participants.isEmpty()) {
-            throw new IllegalArgumentException("La lista de participantes es inválida");
-        }
+        if (participants.isEmpty()) throw new IllegalArgumentException("Lista de participantes inválida");
 
         Expense expense = Expense.builder()
-                .title(request.getTitle())
-                .amount(request.getAmount())
-                .house(house)
-                .paidBy(paidBy)
-                .participants(participants)
-                .settled(false)
-                .build();
+                .title(request.getTitle()).amount(request.getAmount()).house(house)
+                .paidBy(paidBy).participants(participants).settled(false).build();
 
         Expense saved = expenseRepository.save(expense);
-
         String type = expense.getTitle().startsWith("Liquidación:") ? "PAYMENT" : "CREATE";
-
         String msg = type.equals("PAYMENT")
                 ? String.format("%s registró un pago de %s€ hacia %s", paidBy.getUsername(), expense.getAmount(), participants.get(0).getUsername())
                 : String.format("%s añadió el gasto '%s' por %s€", paidBy.getUsername(), expense.getTitle(), expense.getAmount());
 
         activityLogService.log(msg, type, house, paidBy);
-
         return mapToResponse(saved);
     }
 
@@ -75,49 +66,21 @@ public class ExpenseService {
         Expense expense = expenseRepository.findById(expenseId)
                 .orElseThrow(() -> new IllegalArgumentException("El gasto no existe"));
 
-        if (expense.isSettled()) {
-            throw new IllegalStateException("No se puede editar un gasto que ya está liquidado");
-        }
+        if (expense.isSettled()) throw new IllegalStateException("No se puede editar un gasto liquidado");
 
         User modifier = userRepository.findById(requestingUserId)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario solicitante inválido"));
 
         if (!expense.getPaidBy().getId().equals(requestingUserId)) {
-            throw new IllegalArgumentException("Acceso denegado: Solo el dueño de la factura puede editarla");
+            throw new IllegalArgumentException("Acceso denegado: No eres el dueño de esta factura");
         }
-
-        String oldTitle = expense.getTitle();
-        BigDecimal oldAmount = expense.getAmount();
-        List<String> oldParticipants = expense.getParticipants().stream().map(User::getUsername).collect(Collectors.toList());
-
-        List<User> newParticipants = userRepository.findAllById(request.getParticipantIds());
-        if (newParticipants.isEmpty()) throw new IllegalArgumentException("Debe haber al menos un participante");
-
-        List<String> newParticipantsNames = newParticipants.stream().map(User::getUsername).collect(Collectors.toList());
 
         expense.setTitle(request.getTitle());
         expense.setAmount(request.getAmount());
-        expense.setParticipants(newParticipants);
+        expense.setParticipants(userRepository.findAllById(request.getParticipantIds()));
 
         Expense updated = expenseRepository.save(expense);
-
-        List<String> addedParticipants = new ArrayList<>(newParticipantsNames);
-        addedParticipants.removeAll(oldParticipants);
-
-        List<String> removedParticipants = new ArrayList<>(oldParticipants);
-        removedParticipants.removeAll(newParticipantsNames);
-
-        List<String> changeDetails = new ArrayList<>();
-        if (!oldTitle.equals(updated.getTitle())) changeDetails.add(String.format("concepto: '%s' ➔ '%s'", oldTitle, updated.getTitle()));
-        if (oldAmount.compareTo(updated.getAmount()) != 0) changeDetails.add(String.format("importe: %s€ ➔ %s€", oldAmount, updated.getAmount()));
-        if (!addedParticipants.isEmpty()) changeDetails.add(String.format("añadió a %s", String.join(", ", addedParticipants)));
-        if (!removedParticipants.isEmpty()) changeDetails.add(String.format("quitó a %s", String.join(", ", removedParticipants)));
-
-        String detailedMsg = changeDetails.isEmpty()
-                ? String.format("%s guardó cambios en '%s' sin modificar sus valores", modifier.getUsername(), oldTitle)
-                : String.format("%s modificó '%s' (%s)", modifier.getUsername(), oldTitle, String.join(", ", changeDetails));
-
-        activityLogService.log(detailedMsg, "UPDATE", expense.getHouse(), modifier);
+        activityLogService.log(String.format("%s actualizó el gasto '%s'", modifier.getUsername(), expense.getTitle()), "UPDATE", expense.getHouse(), modifier);
         return mapToResponse(updated);
     }
 
@@ -128,22 +91,17 @@ public class ExpenseService {
 
         if (expense.isSettled()) throw new IllegalStateException("No se puede eliminar un gasto liquidado");
 
-        User terminator = userRepository.findById(requestingUserId)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario inválido"));
-
+        User terminator = userRepository.findById(requestingUserId).orElseThrow(() -> new IllegalArgumentException("Usuario inválido"));
         if (!expense.getPaidBy().getId().equals(requestingUserId)) throw new IllegalArgumentException("Acceso denegado");
 
-        String msg = String.format("%s eliminó de la pizarra el gasto '%s' que valía %s€", terminator.getUsername(), expense.getTitle(), expense.getAmount());
-        activityLogService.log(msg, "DELETE", expense.getHouse(), terminator);
-
+        activityLogService.log(String.format("%s eliminó el gasto '%s'", terminator.getUsername(), expense.getTitle()), "DELETE", expense.getHouse(), terminator);
         expenseRepository.delete(expense);
     }
 
-    // MODIFICADO: Filtra y remueve los registros de "Liquidación" de la lista visual de la pizarra
     @Transactional(readOnly = true)
     public List<ExpenseResponse> getHouseExpenses(UUID houseId) {
         return expenseRepository.findByHouseIdAndSettledFalseOrderByCreatedAtDesc(houseId).stream()
-                .filter(e -> !e.getTitle().startsWith("Liquidación:")) // Excluye abonos de la lista común
+                .filter(e -> !e.getTitle().startsWith("Liquidación:"))
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -152,7 +110,7 @@ public class ExpenseService {
     public Map<UUID, MemberStatusResponse> getHouseMemberStatuses(UUID houseId) {
         List<HouseMember> members = houseMemberRepository.findByHouseId(houseId);
         List<Expense> expenses = expenseRepository.findByHouseIdAndSettledFalse(houseId);
-        List<Task> completedTasks = taskRepository.findByHouseIdAndStatusAndDeletedAtIsNull(houseId, TaskStatus.COMPLETED);
+        List<Task> allTasks = taskRepository.findByHouseIdAndDeletedAtIsNull(houseId);
 
         Map<UUID, BigDecimal> rawBalances = new HashMap<>();
         Map<UUID, String> colors = new HashMap<>();
@@ -176,11 +134,44 @@ public class ExpenseService {
             }
         }
 
-        for (Task t : completedTasks) {
-            if (t.getAssignedTo() != null) {
-                UUID rId = t.getAssignedTo().getId();
-                if (pointsMap.containsKey(rId)) {
-                    pointsMap.put(rId, pointsMap.get(rId) + t.getPoints());
+        LocalDateTime now = LocalDateTime.now();
+        int currentMonthValue = now.getMonthValue();
+        int currentYearValue = now.getYear();
+
+        for (Task t : allTasks) {
+            LocalDateTime evaluationDate = t.getCompletedAt() != null ? t.getCompletedAt() : t.getDueDate();
+            if (evaluationDate == null || evaluationDate.getMonthValue() != currentMonthValue || evaluationDate.getYear() != currentYearValue) {
+                continue;
+            }
+
+            if (t.getStatus() == TaskStatus.COMPLETED) {
+                // Protección contra registros antiguos sin traza de usuario
+                if (t.getCompletedBy() == null) {
+                    continue;
+                }
+
+                UUID rescuerId = t.getCompletedBy().getId();
+                UUID assignedId = t.getAssignedTo() != null ? t.getAssignedTo().getId() : null;
+
+                // Caso A Corregido: Validamos que t.getDueDate() y t.getCompletedAt() no sean nulos para evitar caídas
+                if (assignedId != null && !assignedId.equals(rescuerId) && t.getDueDate() != null && t.getCompletedAt() != null && t.getCompletedAt().isAfter(t.getDueDate())) {
+                    if (pointsMap.containsKey(rescuerId)) {
+                        pointsMap.put(rescuerId, pointsMap.get(rescuerId) + t.getPoints());
+                    }
+                    if (pointsMap.containsKey(assignedId)) {
+                        pointsMap.put(assignedId, pointsMap.get(assignedId) - t.getPoints());
+                    }
+                } else {
+                    if (pointsMap.containsKey(rescuerId)) {
+                        pointsMap.put(rescuerId, pointsMap.get(rescuerId) + t.getPoints());
+                    }
+                }
+            } else if (t.getStatus() == TaskStatus.PENDING) {
+                if (t.getDueDate() != null && t.getDueDate().isBefore(now) && t.getAssignedTo() != null) {
+                    UUID assignedId = t.getAssignedTo().getId();
+                    if (pointsMap.containsKey(assignedId)) {
+                        pointsMap.put(assignedId, pointsMap.get(assignedId) - t.getPoints());
+                    }
                 }
             }
         }
@@ -213,11 +204,9 @@ public class ExpenseService {
         for (Expense e : expenses) {
             UUID payerId = e.getPaidBy().getId();
             balances.put(payerId, balances.getOrDefault(payerId, BigDecimal.ZERO).add(e.getAmount()));
-
             BigDecimal share = e.getAmount().divide(BigDecimal.valueOf(e.getParticipants().size()), 2, RoundingMode.HALF_UP);
-            for (User participant : e.getParticipants()) {
-                UUID pId = participant.getId();
-                balances.put(pId, balances.getOrDefault(pId, BigDecimal.ZERO).subtract(share));
+            for (User p : e.getParticipants()) {
+                balances.put(p.getId(), balances.getOrDefault(p.getId(), BigDecimal.ZERO).subtract(share));
             }
         }
 
@@ -225,33 +214,20 @@ public class ExpenseService {
         List<Map.Entry<UUID, BigDecimal>> creditors = new ArrayList<>();
 
         for (Map.Entry<UUID, BigDecimal> entry : balances.entrySet()) {
-            if (entry.getValue().compareTo(BigDecimal.valueOf(0.01)) > 0) {
-                creditors.add(new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue()));
-            } else if (entry.getValue().compareTo(BigDecimal.valueOf(-0.01)) < 0) {
-                debtors.add(new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue().abs()));
-            }
+            if (entry.getValue().compareTo(BigDecimal.valueOf(0.01)) > 0) creditors.add(new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue()));
+            else if (entry.getValue().compareTo(BigDecimal.valueOf(-0.01)) < 0) debtors.add(new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue().abs()));
         }
 
         List<DebtSettlementResponse> settlements = new ArrayList<>();
         int dIdx = 0, cIdx = 0;
-
         while (dIdx < debtors.size() && cIdx < creditors.size()) {
             Map.Entry<UUID, BigDecimal> debtor = debtors.get(dIdx);
             Map.Entry<UUID, BigDecimal> creditor = creditors.get(cIdx);
-
             BigDecimal minAmount = debtor.getValue().min(creditor.getValue());
 
-            settlements.add(DebtSettlementResponse.builder()
-                    .debtorId(debtor.getKey())
-                    .debtorUsername(usernames.get(debtor.getKey()))
-                    .creditorId(creditor.getKey())
-                    .creditorUsername(usernames.get(creditor.getKey()))
-                    .amount(minAmount)
-                    .build());
-
+            settlements.add(DebtSettlementResponse.builder().debtorId(debtor.getKey()).debtorUsername(usernames.get(debtor.getKey())).creditorId(creditor.getKey()).creditorUsername(usernames.get(creditor.getKey())).amount(minAmount).build());
             debtor.setValue(debtor.getValue().subtract(minAmount));
             creditor.setValue(creditor.getValue().subtract(minAmount));
-
             if (debtor.getValue().compareTo(BigDecimal.valueOf(0.01)) < 0) dIdx++;
             if (creditor.getValue().compareTo(BigDecimal.valueOf(0.01)) < 0) cIdx++;
         }
@@ -269,14 +245,9 @@ public class ExpenseService {
 
     private ExpenseResponse mapToResponse(Expense expense) {
         return ExpenseResponse.builder()
-                .id(expense.getId())
-                .title(expense.getTitle())
-                .amount(expense.getAmount())
-                .paidById(expense.getPaidBy().getId())
-                .paidByUsername(expense.getPaidBy().getUsername())
+                .id(expense.getId()).title(expense.getTitle()).amount(expense.getAmount())
+                .paidById(expense.getPaidBy().getId()).paidByUsername(expense.getPaidBy().getUsername())
                 .participantUsernames(expense.getParticipants().stream().map(User::getUsername).collect(Collectors.toList()))
-                .settled(expense.isSettled())
-                .createdAt(expense.getCreatedAt())
-                .build();
+                .settled(expense.isSettled()).createdAt(expense.getCreatedAt()).build();
     }
 }

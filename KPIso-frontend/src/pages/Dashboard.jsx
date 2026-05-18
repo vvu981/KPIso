@@ -56,19 +56,6 @@ const MODAL_INITIAL = { name: '', inviteCode: '', profilePictureUrl: '' };
 
 /**
  * Dashboard — Panel principal de gestión de viviendas
- *
- * Principio S: responsabilidad única de gestionar viviendas del usuario
- * Principio O: extensible con nuevos tipos de tarjetas sin modificar la base
- * Principio L: reutiliza componentes de forma intercambiable
- * Principio I: props bien segregadas en subcomponentes
- * Principio D: depende de abstracciones (API, contexto, componentes)
- *
- * Funcionalidades:
- * - Listar viviendas activas y archivadas
- * - Crear nueva vivienda
- * - Unirse a vivienda existente
- * - Archivar vivienda
- * - Navegación a detalle de vivienda
  */
 export default function Dashboard() {
     const authContext = useContext(AuthContext);
@@ -530,15 +517,15 @@ function HouseCard({ house, isDeleted, onDelete }) {
  * HouseModal — Modal para crear o unirse a vivienda
  */
 function HouseModal({
-    show,
-    type,
-    onClose,
-    onSubmit,
-    formData,
-    onFormChange,
-    error,
-    submitting,
-}) {
+                        show,
+                        type,
+                        onClose,
+                        onSubmit,
+                        formData,
+                        onFormChange,
+                        error,
+                        submitting,
+                    }) {
     const isCreate = type === 'create';
 
     return (

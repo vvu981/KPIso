@@ -9,6 +9,7 @@ import com.kpiso.api.modules.task.dto.TaskResponse;
 import com.kpiso.api.modules.user.User;
 import com.kpiso.api.modules.user.UserRepository;
 import com.kpiso.api.modules.activity.ActivityLogService;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
@@ -132,7 +133,7 @@ public class TaskService {
     }
 
     @Transactional(readOnly = true)
-    public List<TaskResponse> getHouseTasks(UUID houseId) {
+    public List<TaskResponse> getTasksByHouse(UUID houseId) {
         return taskRepository.findByHouseIdAndDeletedAtIsNull(houseId).stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -242,5 +243,45 @@ public class TaskService {
                 .dueDate(task.getDueDate())
                 .assignedTo(userDto)
                 .build();
+    }
+
+    // MODIFICADO: Sistema unificado de auditoría transparente que elimina el uso de SecurityContextHolder
+    @Transactional
+    public void toggleTaskStatus(UUID taskId, String targetStatusStr, UUID userId) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new IllegalArgumentException("La tarea especificada no existe"));
+
+        TaskStatus targetStatus = TaskStatus.valueOf(targetStatusStr.toUpperCase());
+        task.setStatus(targetStatus);
+
+        // Identificamos directamente al actor que realiza la petición web por su ID
+        User actor = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario ejecutor no encontrado"));
+
+        if (targetStatus == TaskStatus.COMPLETED) {
+            task.setCompletedBy(actor);
+            task.setCompletedAt(LocalDateTime.now());
+
+            // Registro inteligente en el diario de transparencia
+            String msg;
+            User assigned = task.getAssignedTo();
+            if (assigned != null && !assigned.getId().equals(userId) && task.getDueDate() != null && task.getCompletedAt().isAfter(task.getDueDate())) {
+                msg = String.format("%s rescató el deber vencido '%s' de %s (+%d pts para %s, -%d pts para %s)",
+                        actor.getUsername(), task.getTitle(), assigned.getUsername(), task.getPoints(), actor.getUsername(), task.getPoints(), assigned.getUsername());
+                activityLogService.log(msg, "UPDATE", task.getHouse(), actor);
+            } else {
+                msg = String.format("%s completó el deber '%s' (+%d pts)", actor.getUsername(), task.getTitle(), task.getPoints());
+                activityLogService.log(msg, "UPDATE", task.getHouse(), actor);
+            }
+        } else {
+            // Al reabrir, limpiamos las auditorías de cierre de la base de datos
+            task.setCompletedBy(null);
+            task.setCompletedAt(null);
+
+            String msg = String.format("%s reabrió el deber '%s'", actor.getUsername(), task.getTitle());
+            activityLogService.log(msg, "UPDATE", task.getHouse(), actor);
+        }
+
+        taskRepository.save(task);
     }
 }
