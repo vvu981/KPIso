@@ -96,6 +96,7 @@ export default function HouseDetail() {
     const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
     const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
     const [selectedTask, setSelectedTask] = useState(null);
+    const [selectedUserFilter, setSelectedUserFilter] = useState(''); // NUEVO: Estado del filtro de conviviente
 
     // Estado de formularios
     const [showTaskForm, setShowTaskForm] = useState(false);
@@ -543,6 +544,8 @@ export default function HouseDetail() {
                                     ? (setCurrentMonth(0), setCurrentYear(currentYear + 1))
                                     : setCurrentMonth(currentMonth + 1)
                             }
+                            selectedUserFilter={selectedUserFilter}
+                            onUserFilterChange={setSelectedUserFilter}
                         />
                     )}
 
@@ -904,11 +907,12 @@ function TasksSection({
                           currentYear,
                           onPrevMonth,
                           onNextMonth,
+                          selectedUserFilter, // NUEVO
+                          onUserFilterChange, // NUEVO
                       }) {
     const now = new Date();
 
     const isTaskInCurrentPeriod = (task) => {
-        // MODIFICADO (REGLA DE LIGA): Si la tarea está pendiente y va retrasada, DEBE mostrarse siempre en la lista como rescatable
         if (task.status === 'PENDING' && task.dueDate && new Date(task.dueDate) < now) {
             return true;
         }
@@ -967,18 +971,46 @@ function TasksSection({
                 />
             )}
 
+            {/* MODIFICADO: Barra de controles unificada que aloja el switch de vista y el nuevo filtro de convivientes */}
             {!showTaskForm && (
-                <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-5)' }}>
-                    {['list', 'calendar'].map((mode) => (
-                        <Button
-                            key={mode}
-                            variant={taskViewMode === mode ? 'primary' : 'secondary'}
-                            size="sm"
-                            onClick={() => onTaskViewModeChange(mode)}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-4)', marginBottom: 'var(--space-5)', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                        {['list', 'calendar'].map((mode) => (
+                            <Button
+                                key={mode}
+                                variant={taskViewMode === mode ? 'primary' : 'secondary'}
+                                size="sm"
+                                onClick={() => onTaskViewModeChange(mode)}
+                            >
+                                {mode === 'list' ? <><IconListBullet /> Lista</> : <><IconCalendar /> Calendario</>}
+                            </Button>
+                        ))}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                        <label htmlFor="user-task-filter" style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-bold)', color: 'var(--text-secondary)' }}>
+                            Asignado a:
+                        </label>
+                        <select
+                            id="user-task-filter"
+                            value={selectedUserFilter}
+                            onChange={(e) => onUserFilterChange(e.target.value)}
+                            style={{
+                                padding: 'var(--space-2)',
+                                borderRadius: 'var(--radius-md)',
+                                border: '1px solid var(--border-default)',
+                                fontSize: 'var(--text-xs)',
+                                backgroundColor: 'var(--bg-base)',
+                                color: 'var(--text-primary)',
+                                cursor: 'pointer'
+                            }}
                         >
-                            {mode === 'list' ? <><IconListBullet /> Lista</> : <><IconCalendar /> Calendario</>}
-                        </Button>
-                    ))}
+                            <option value="">-- Todos los convivientes --</option>
+                            {house.members.map(m => (
+                                <option key={m.userId} value={m.userId}>{m.username}</option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
             )}
 
@@ -992,20 +1024,25 @@ function TasksSection({
                 !showTaskForm && (
                     taskViewMode === 'list' ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                            {tasks.filter(isTaskInCurrentPeriod).map((task) => {
-                                const isExpired = task.status === 'PENDING' && task.dueDate && new Date(task.dueDate) < now;
-                                return (
-                                    <TaskListItem
-                                        key={task.id}
-                                        task={task}
-                                        isExpired={isExpired}
-                                        onSelect={() => onSelectTask(task)}
-                                        onEdit={() => onEditTask(task)}
-                                        onDelete={() => onDeleteTask(task.id)}
-                                        onToggleStatus={() => onToggleStatus(task.id, task.status)}
-                                    />
-                                );
-                            })}
+                            {/* MODIFICADO: Aplicación cruzada del filtro por usuario en la lista de deberes */}
+                            {tasks
+                                .filter(isTaskInCurrentPeriod)
+                                .filter(task => !selectedUserFilter || task.assignedTo?.id === selectedUserFilter)
+                                .map((task) => {
+                                    const isExpired = task.status === 'PENDING' && task.dueDate && new Date(task.dueDate) < now;
+                                    return (
+                                        <TaskListItem
+                                            key={task.id}
+                                            task={task}
+                                            isExpired={isExpired}
+                                            onSelect={() => onSelectTask(task)}
+                                            onEdit={() => onEditTask(task)}
+                                            onDelete={() => onDeleteTask(task.id)}
+                                            onToggleStatus={() => onToggleStatus(task.id, task.status)}
+                                        />
+                                    );
+                                })
+                            }
                         </div>
                     ) : (
                         <div style={{ userSelect: 'none' }}>
@@ -1026,7 +1063,12 @@ function TasksSection({
                                 {generateCalendarDays().map((dayDate, idx) => {
                                     if (dayDate === null) return <div key={`empty-${idx}`} style={{ minHeight: '80px', backgroundColor: 'transparent', opacity: 0.2 }}></div>;
                                     const dateStr = dayDate.toDateString();
-                                    const dayTasks = tasks.filter(t => t.dueDate && new Date(t.dueDate).toDateString() === dateStr);
+
+                                    {/* MODIFICADO: Aplicación cruzada del filtro por usuario dentro de las celdas del calendario mensual */}
+                                    const dayTasks = tasks
+                                        .filter(t => t.dueDate && new Date(t.dueDate).toDateString() === dateStr)
+                                        .filter(t => !selectedUserFilter || t.assignedTo?.id === selectedUserFilter);
+
                                     return (
                                         <div
                                             key={dateStr}
