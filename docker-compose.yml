@@ -1,0 +1,56 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: kpiso-db
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - kpiso-db-data:/var/lib/postgresql/data
+    networks:
+      - kpiso-network
+    restart: always
+
+  backend:
+    build:
+      context: ./KPIso-backend
+      dockerfile: Dockerfile
+    container_name: kpiso-backend-api
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/${DB_NAME}
+      - SPRING_DATASOURCE_USERNAME=${DB_USER}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
+      - APP_FRONTEND_URL=${FRONTEND_URL}
+    depends_on:
+      - db
+    networks:
+      - kpiso-network
+    restart: always
+
+  frontend:
+    build:
+      context: ./KPIso-frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=${VITE_API_URL}
+    container_name: kpiso-frontend-app
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - kpiso-network
+    restart: always
+
+volumes:
+  kpiso-db-data:
+    driver: local
+
+networks:
+  kpiso-network:
+    driver: bridge
