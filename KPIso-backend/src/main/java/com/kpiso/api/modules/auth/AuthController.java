@@ -22,40 +22,33 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<String> register(@Valid @RequestBody RegisterRequest request) {
-        try {
-            authService.register(request);
-            return ResponseEntity.status(HttpStatus.CREATED).body("Usuario registrado correctamente");
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-        }
+    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
+        authService.register(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body("Usuario registrado correctamente");
     }
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        try {
-            TokenResponseDto tokens = authService.login(request);
+        TokenResponseDto tokens = authService.login(request);
 
-            ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", tokens.getRefreshToken())
-                    .httpOnly(true)
-                    .secure(false)
-                    .path("/api/v1/auth")
-                    .maxAge(7L * 24 * 60 * 60)
-                    .sameSite("Strict")
-                    .build();
+        ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", tokens.getRefreshToken())
+                .httpOnly(true)
+                .secure(false)
+                .path("/api/v1/auth")
+                .maxAge(7L * 24 * 60 * 60)
+                .sameSite("Strict")
+                .build();
 
-            LoginResponse responseBody = LoginResponse.builder()
-                    .accessToken(tokens.getAccessToken())
-                    .userId(tokens.getUserId())
-                    .username(tokens.getUsername())
-                    .build();
+        LoginResponse responseBody = LoginResponse.builder()
+                .accessToken(tokens.getAccessToken())
+                .userId(tokens.getUserId())
+                .username(tokens.getUsername())
+            .email(tokens.getEmail())
+            .profilePictureUrl(tokens.getProfilePictureUrl())
+                .build();
 
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
-                    .body(responseBody);
-
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
+                .body(responseBody);
     }
 }

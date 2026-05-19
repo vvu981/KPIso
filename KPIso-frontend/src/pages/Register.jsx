@@ -8,6 +8,46 @@ import { ThemeToggle } from '../components/layout/Navbar.jsx';
 import { IconSun, IconMoon } from '../components/ui/Icons.jsx';
 import logo from '../assets/favicon.svg';
 
+function buildRegisterPayload(formData) {
+    const profilePictureUrl = formData.profilePictureUrl.trim();
+
+    return {
+        email: formData.email.trim(),
+        username: formData.username.trim(),
+        password: formData.password,
+        profilePictureUrl: profilePictureUrl.length > 0 ? profilePictureUrl : null,
+    };
+}
+
+function extractRegisterErrorMessage(errorResponse) {
+    if (typeof errorResponse === 'string') {
+        return errorResponse;
+    }
+
+    if (Array.isArray(errorResponse?.errors)) {
+        return errorResponse.errors.join('\n');
+    }
+
+    if (errorResponse?.errors && typeof errorResponse.errors === 'object') {
+        const fieldErrors = Object.entries(errorResponse.errors)
+            .map(([field, message]) => `${field}: ${message}`);
+
+        if (fieldErrors.length > 0) {
+            return fieldErrors.join(' · ');
+        }
+    }
+
+    if (typeof errorResponse?.message === 'string' && errorResponse.message.trim().length > 0) {
+        return errorResponse.message;
+    }
+
+    if (typeof errorResponse?.error === 'string' && errorResponse.error.trim().length > 0) {
+        return errorResponse.error;
+    }
+
+    return 'Error en el registro. Verifica los datos.';
+}
+
 /**
  * Register — Pantalla de creación de cuenta
  *
@@ -36,11 +76,12 @@ export default function Register({ isDark, onToggleTheme }) {
         setSuccess('');
         setLoading(true);
         try {
-            await api.post('/auth/register', formData);
+            const payload = buildRegisterPayload(formData);
+            await api.post('/auth/register', payload);
             setSuccess('¡Registro completado! Redirigiendo al inicio de sesión...');
             setTimeout(() => navigate('/login'), 2000);
         } catch (err) {
-            setError(err.response?.data || 'Error en el registro. Verifica los datos.');
+            setError(extractRegisterErrorMessage(err.response?.data));
         } finally {
             setLoading(false);
         }
@@ -193,11 +234,11 @@ export default function Register({ isDark, onToggleTheme }) {
                         <Input
                             id="reg-pic"
                             label="URL foto de perfil"
-                            type="url"
+                            type="text"
                             value={formData.profilePictureUrl}
                             onChange={handleChange('profilePictureUrl')}
                             placeholder="https://... (opcional)"
-                            hint="Puedes dejarlo vacío y añadirlo después"
+                            hint="Pega una URL pública de imagen o déjalo vacío"
                         />
 
                         <Button
