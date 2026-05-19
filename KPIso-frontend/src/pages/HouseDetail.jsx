@@ -8,6 +8,7 @@ import { Badge } from '../components/ui/Badge.jsx';
 import { Alert } from '../components/ui/Alert.jsx';
 import { Input } from '../components/ui/Input.jsx';
 import { PageLoader } from '../components/layout/PageLoader.jsx';
+import ShoppingListSection from '../components/shopping/ShoppingListSection.jsx';
 import {
     IconClipboardDocumentList, IconBanknotes, IconMagnifyingGlass,
     IconCalendar, IconListBullet, IconCheck, IconXMark,
@@ -567,6 +568,14 @@ export default function HouseDetail() {
                         />
                     )}
 
+                    {activeTab === 'shopping' && (
+                        <ShoppingListSection
+                            houseId={houseId}
+                            currentUserId={currentUserId}
+                            onPurchaseRegistered={fetchData}
+                        />
+                    )}
+
                     {activeTab === 'history' && (
                         <HistorySection activityLogs={activityLogs} />
                     )}
@@ -728,7 +737,7 @@ function HouseDetailHeader({ house, activeTab, onTabChange, onEditClick, onDelet
                     paddingTop: 'var(--space-4)',
                 }}
             >
-                {['tasks', 'expenses', 'history'].map((tab) => (
+                {['tasks', 'expenses', 'shopping', 'history'].map((tab) => (
                     <button
                         key={tab}
                         onClick={() => onTabChange(tab)}
@@ -749,6 +758,7 @@ function HouseDetailHeader({ house, activeTab, onTabChange, onEditClick, onDelet
                     >
                         {tab === 'tasks' && <><IconClipboard /> Deberes</>}
                         {tab === 'expenses' && <><IconCurrencyEuro /> Gastos</>}
+                        {tab === 'shopping' && <><IconClipboardDocumentList /> Compra</>}
                         {tab === 'history' && <><IconShield /> Transparencia</>}
                     </button>
                 ))}
@@ -852,13 +862,7 @@ function HouseSidebar({
                                             onChange={(e) => onColorChange(e.target.value)}
                                             style={{ width: 18, height: 18, border: 'none', borderRadius: '4px', cursor: 'pointer', backgroundColor: 'transparent' }}
                                         />
-                                        <button
-                                            onClick={onEditProfile}
-                                            title="Editar mi perfil"
-                                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', color: 'var(--text-secondary)' }}
-                                        >
-                                            <IconPencil />
-                                        </button>
+                                        
                                     </div>
                                 )}
                                 {isAdmin && member.userId !== currentUserId && (

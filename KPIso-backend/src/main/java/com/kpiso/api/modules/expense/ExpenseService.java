@@ -49,7 +49,9 @@ public class ExpenseService {
 
         Expense expense = Expense.builder()
                 .title(request.getTitle()).amount(request.getAmount()).house(house)
-                .paidBy(paidBy).participants(participants).settled(false).build();
+                .paidBy(paidBy).participants(participants)
+                .exactSplits(request.getExactSplits())
+                .settled(false).build();
 
         Expense saved = expenseRepository.save(expense);
         String type = expense.getTitle().startsWith("Liquidación:") ? "PAYMENT" : "CREATE";
@@ -78,6 +80,7 @@ public class ExpenseService {
         expense.setTitle(request.getTitle());
         expense.setAmount(request.getAmount());
         expense.setParticipants(userRepository.findAllById(request.getParticipantIds()));
+        expense.setExactSplits(request.getExactSplits());
 
         Expense updated = expenseRepository.save(expense);
         activityLogService.log(String.format("%s actualizó el gasto '%s'", modifier.getUsername(), expense.getTitle()), "UPDATE", expense.getHouse(), modifier);
@@ -127,10 +130,17 @@ public class ExpenseService {
             UUID payerId = e.getPaidBy().getId();
             rawBalances.put(payerId, rawBalances.getOrDefault(payerId, BigDecimal.ZERO).add(e.getAmount()));
 
-            BigDecimal share = e.getAmount().divide(BigDecimal.valueOf(e.getParticipants().size()), 2, RoundingMode.HALF_UP);
-            for (User participant : e.getParticipants()) {
-                UUID pId = participant.getId();
-                rawBalances.put(pId, rawBalances.getOrDefault(pId, BigDecimal.ZERO).subtract(share));
+            if (e.getExactSplits() != null && !e.getExactSplits().isEmpty()) {
+                for (java.util.Map.Entry<UUID, BigDecimal> entry : e.getExactSplits().entrySet()) {
+                    UUID pId = entry.getKey();
+                    rawBalances.put(pId, rawBalances.getOrDefault(pId, BigDecimal.ZERO).subtract(entry.getValue()));
+                }
+            } else {
+                BigDecimal share = e.getAmount().divide(BigDecimal.valueOf(e.getParticipants().size()), 2, java.math.RoundingMode.HALF_UP);
+                for (User participant : e.getParticipants()) {
+                    UUID pId = participant.getId();
+                    rawBalances.put(pId, rawBalances.getOrDefault(pId, BigDecimal.ZERO).subtract(share));
+                }
             }
         }
 
@@ -204,9 +214,16 @@ public class ExpenseService {
         for (Expense e : expenses) {
             UUID payerId = e.getPaidBy().getId();
             balances.put(payerId, balances.getOrDefault(payerId, BigDecimal.ZERO).add(e.getAmount()));
-            BigDecimal share = e.getAmount().divide(BigDecimal.valueOf(e.getParticipants().size()), 2, RoundingMode.HALF_UP);
-            for (User p : e.getParticipants()) {
-                balances.put(p.getId(), balances.getOrDefault(p.getId(), BigDecimal.ZERO).subtract(share));
+            if (e.getExactSplits() != null && !e.getExactSplits().isEmpty()) {
+                for (Map.Entry<UUID, BigDecimal> entry : e.getExactSplits().entrySet()) {
+                    UUID pId = entry.getKey();
+                    balances.put(pId, balances.getOrDefault(pId, BigDecimal.ZERO).subtract(entry.getValue()));
+                }
+            } else {
+                BigDecimal share = e.getAmount().divide(BigDecimal.valueOf(e.getParticipants().size()), 2, RoundingMode.HALF_UP);
+                for (User p : e.getParticipants()) {
+                    balances.put(p.getId(), balances.getOrDefault(p.getId(), BigDecimal.ZERO).subtract(share));
+                }
             }
         }
 

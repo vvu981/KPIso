@@ -400,6 +400,40 @@ class ExpenseServiceTest {
     }
 
     @Test
+    void calculateSettlementsShouldRespectExactSplits() {
+        User memberA = TestFixtures.user("ana", "ana@email.com");
+        User memberB = TestFixtures.user("bea", "bea@email.com");
+
+        HouseMember houseMemberA = TestFixtures.houseMember(house, memberA, HouseRole.ADMIN, "#ff0000");
+        HouseMember houseMemberB = TestFixtures.houseMember(house, memberB, HouseRole.MEMBER, "#00ff00");
+
+        Expense expense = Expense.builder()
+                .id(UUID.randomUUID())
+                .title("Compra proporcional")
+                .amount(new BigDecimal("3.00"))
+                .house(house)
+                .paidBy(memberA)
+                .participants(List.of(memberA, memberB))
+                .exactSplits(Map.of(
+                        memberA.getId(), new BigDecimal("2.08"),
+                        memberB.getId(), new BigDecimal("0.92")
+                ))
+                .settled(false)
+                .build();
+
+        when(houseMemberRepository.findByHouseId(house.getId())).thenReturn(List.of(houseMemberA, houseMemberB));
+        when(expenseRepository.findByHouseIdAndSettledFalse(house.getId())).thenReturn(List.of(expense));
+
+        List<DebtSettlementResponse> settlements = expenseService.calculateSettlements(house.getId());
+
+        assertEquals(1, settlements.size());
+        DebtSettlementResponse settlement = settlements.get(0);
+        assertEquals(memberB.getId(), settlement.getDebtorId());
+        assertEquals(memberA.getId(), settlement.getCreditorId());
+        assertEquals(0, settlement.getAmount().compareTo(new BigDecimal("0.92")));
+    }
+
+    @Test
     void settleAllHouseExpensesShouldMarkExpensesAsSettled() {
         Expense expenseA = Expense.builder().id(UUID.randomUUID()).title("Compra A").amount(new BigDecimal("10.00")).house(house).paidBy(payer).participants(List.of(participantA)).settled(false).build();
         Expense expenseB = Expense.builder().id(UUID.randomUUID()).title("Compra B").amount(new BigDecimal("5.00")).house(house).paidBy(payer).participants(List.of(participantA)).settled(false).build();

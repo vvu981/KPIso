@@ -31,4 +31,7 @@ public class CreateExpenseRequest {
 
     @NotEmpty(message = "Debe haber al menos un participante en el gasto")
     private List<UUID> participantIds;
+
+    // Opcional: si se provee, la división no será a partes iguales, sino exacta por usuario
+    private java.util.Map<UUID, BigDecimal> exactSplits;
 }
