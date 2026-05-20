@@ -85,7 +85,6 @@ export default function HouseDetail() {
     const [tasks, setTasks] = useState([]);
     const [expenses, setExpenses] = useState([]);
     const [settlements, setSettlements] = useState([]);
-    const [activityLogs, setActivityLogs] = useState([]);
     const [memberStatuses, setMemberStatuses] = useState({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -97,7 +96,7 @@ export default function HouseDetail() {
     const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
     const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
     const [selectedTask, setSelectedTask] = useState(null);
-    const [selectedUserFilter, setSelectedUserFilter] = useState(''); // NUEVO: Estado del filtro de conviviente
+    const [selectedUserFilter, setSelectedUserFilter] = useState('');
 
     // Estado de formularios
     const [showTaskForm, setShowTaskForm] = useState(false);
@@ -147,16 +146,15 @@ export default function HouseDetail() {
     }, [currentUserId, navigate]);
 
     /**
-     * Cargar todos los datos de la vivienda
+     * Cargar los datos troncales de la vivienda (desacoplado del historial)
      */
     const fetchData = async () => {
         try {
-            const [houseRes, tasksRes, expensesRes, settlementRes, historyRes, statusRes] = await Promise.all([
+            const [houseRes, tasksRes, expensesRes, settlementRes, statusRes] = await Promise.all([
                 api.get(`/houses/${houseId}`),
                 api.get(`/tasks/house/${houseId}`),
                 api.get(`/expenses/house/${houseId}`),
                 api.get(`/expenses/house/${houseId}/settlement`),
-                api.get(`/activities/house/${houseId}`),
                 api.get(`/expenses/house/${houseId}/statuses`),
             ]);
 
@@ -164,7 +162,6 @@ export default function HouseDetail() {
             setTasks(tasksRes.data);
             setExpenses(expensesRes.data);
             setSettlements(settlementRes.data);
-            setActivityLogs(historyRes.data);
             setMemberStatuses(statusRes.data);
         } catch (err) {
             setError('Error al cargar la vivienda. Intenta más tarde.');
@@ -576,8 +573,9 @@ export default function HouseDetail() {
                         />
                     )}
 
+                    {/* El historial ahora se encarga de sus propios datos */}
                     {activeTab === 'history' && (
-                        <HistorySection activityLogs={activityLogs} />
+                        <HistorySection houseId={houseId} />
                     )}
                 </section>
             </main>
@@ -911,8 +909,8 @@ function TasksSection({
                           currentYear,
                           onPrevMonth,
                           onNextMonth,
-                          selectedUserFilter, // NUEVO
-                          onUserFilterChange, // NUEVO
+                          selectedUserFilter,
+                          onUserFilterChange,
                       }) {
     const now = new Date();
 
@@ -975,7 +973,6 @@ function TasksSection({
                 />
             )}
 
-            {/* MODIFICADO: Barra de controles unificada que aloja el switch de vista y el nuevo filtro de convivientes */}
             {!showTaskForm && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-4)', marginBottom: 'var(--space-5)', flexWrap: 'wrap' }}>
                     <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
@@ -1028,7 +1025,6 @@ function TasksSection({
                 !showTaskForm && (
                     taskViewMode === 'list' ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                            {/* MODIFICADO: Aplicación cruzada del filtro por usuario en la lista de deberes */}
                             {tasks
                                 .filter(isTaskInCurrentPeriod)
                                 .filter(task => !selectedUserFilter || task.assignedTo?.id === selectedUserFilter)
@@ -1068,7 +1064,6 @@ function TasksSection({
                                     if (dayDate === null) return <div key={`empty-${idx}`} style={{ minHeight: '80px', backgroundColor: 'transparent', opacity: 0.2 }}></div>;
                                     const dateStr = dayDate.toDateString();
 
-                                    {/* MODIFICADO: Aplicación cruzada del filtro por usuario dentro de las celdas del calendario mensual */}
                                     const dayTasks = tasks
                                         .filter(t => t.dueDate && new Date(t.dueDate).toDateString() === dateStr)
                                         .filter(t => !selectedUserFilter || t.assignedTo?.id === selectedUserFilter);
@@ -1486,9 +1481,45 @@ function ExpensesSection({
 }
 
 /**
- * HistorySection — Sección de transparencia y auditoría
+ * HistorySection — Sección de transparencia y auditoría (AHORA PAGINADA E INDEPENDIENTE)
  */
-function HistorySection({ activityLogs }) {
+function HistorySection({ houseId }) {
+    const authContext = useContext(AuthContext);
+    const { token } = authContext || {};
+    
+    const [logs, setLogs] = useState([]);
+    const [page, setPage] = useState(0);
+    const [hasMore, setHasMore] = useState(true);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+
+    const loadLogs = async (pageNumber, isInitial = false) => {
+        if (!houseId) return;
+        setLoading(true);
+        setError(null);
+        
+        try {
+            const response = await api.get(`/activity/house/${houseId}?page=${pageNumber}&size=20`, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {}
+            });
+            
+            const newLogs = response.data.content || [];
+            
+            setLogs(prev => isInitial ? newLogs : [...prev, ...newLogs]);
+            setHasMore(!response.data.last); 
+            setPage(pageNumber);
+        } catch (err) {
+            console.error('Error al cargar la actividad:', err);
+            setError('No se pudo cargar el historial de actividad.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        loadLogs(0, true);
+    }, [houseId]);
+
     return (
         <Card padding="lg">
             <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--font-bold)', marginBottom: 'var(--space-4)' }}>
@@ -1497,13 +1528,15 @@ function HistorySection({ activityLogs }) {
                 </span>
             </h2>
 
-            {activityLogs.length === 0 ? (
+            {error && <Alert type="error" message={error} />}
+
+            {logs.length === 0 && !loading ? (
                 <p style={{ color: 'var(--text-tertiary)', textAlign: 'center', padding: 'var(--space-8)' }}>
                     Sin registro de actividades todavía.
                 </p>
             ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                    {activityLogs.map((log) => (
+                    {logs.map((log) => (
                         <div
                             key={log.id || log.createdAt}
                             style={{
@@ -1525,6 +1558,18 @@ function HistorySection({ activityLogs }) {
                             </p>
                         </div>
                     ))}
+                </div>
+            )}
+
+            {hasMore && (
+                <div style={{ marginTop: 'var(--space-4)', textAlign: 'center' }}>
+                    <Button 
+                        variant="secondary" 
+                        onClick={() => loadLogs(page + 1)}
+                        disabled={loading}
+                    >
+                        {loading ? 'Cargando...' : 'Cargar historial anterior'}
+                    </Button>
                 </div>
             )}
         </Card>

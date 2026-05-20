@@ -1,13 +1,15 @@
 package com.kpiso.api.modules.activity;
 
 import com.kpiso.api.modules.activity.dto.ActivityLogResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import java.util.List;
+
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/activities")
+@RequestMapping("/activity")
 public class ActivityLogController {
 
     private final ActivityLogService activityLogService;
@@ -16,9 +18,15 @@ public class ActivityLogController {
         this.activityLogService = activityLogService;
     }
 
+    // Adaptado para recibir los parámetros de paginación y emitir un Pageable
     @GetMapping("/house/{houseId}")
-    public ResponseEntity<List<ActivityLogResponse>> getHouseLogs(@PathVariable UUID houseId) {
-        List<ActivityLogResponse> logs = activityLogService.getHouseLogs(houseId);
-        return ResponseEntity.ok(logs);
+    public ResponseEntity<Page<ActivityLogResponse>> getHouseActivity(
+            @PathVariable UUID houseId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        PageRequest pageRequest = PageRequest.of(page, size);
+        Page<ActivityLogResponse> activityPage = activityLogService.getHouseActivity(houseId, pageRequest);
+        return ResponseEntity.ok(activityPage);
     }
 }

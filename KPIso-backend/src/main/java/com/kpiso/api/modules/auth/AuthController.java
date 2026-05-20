@@ -24,7 +24,8 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
         authService.register(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body("Usuario registrado correctamente");
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(java.util.Map.of("message", "Usuario registrado correctamente"));
     }
 
     @PostMapping("/login")
@@ -43,8 +44,8 @@ public class AuthController {
                 .accessToken(tokens.getAccessToken())
                 .userId(tokens.getUserId())
                 .username(tokens.getUsername())
-            .email(tokens.getEmail())
-            .profilePictureUrl(tokens.getProfilePictureUrl())
+                .email(tokens.getEmail())
+                .profilePictureUrl(tokens.getProfilePictureUrl())
                 .build();
 
         return ResponseEntity.ok()

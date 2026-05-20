@@ -43,13 +43,11 @@ const IconChevronUp = () => (
 
 /**
  * ShoppingListSection — Componente de Lista de la Compra Inteligente
- * 
- * Características:
- * - Añadir productos con búsqueda en Open Food Facts
+ * * Características:
+ * - Añadir productos con búsqueda en Open Food Facts (con soporte manual fallback)
  * - Panel de presupuesto estimado
  * - Listado de productos PENDING (sin comprar)
- * - Historial colapsable de productos BOUGHT (comprados)
- * - Gestión de estados (pendiente, comprado, eliminado)
+ * - Historial colapsable de productos BOUGHT (comprados e inmutables)
  */
 export default function ShoppingListSection({ houseId, currentUserId, onPurchaseRegistered }) {
     const authContext = useContext(AuthContext);
@@ -294,9 +292,14 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
     };
 
     /**
-     * Elimina un ítem de la lista
+     * Elimina un ítem de la lista. Solo permitido si no ha sido comprado.
      */
     const handleDeleteItem = async (itemId, itemName, isPending) => {
+        if (!isPending) {
+            setError("Los productos ya comprados son parte del historial financiero y no se pueden eliminar.");
+            return;
+        }
+
         if (!confirm(`¿Estás seguro de que quieres eliminar "${itemName}"?`)) {
             return;
         }
@@ -310,19 +313,12 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
             });
 
             // Actualizar la lista
-            if (isPending) {
-                const deletedItem = shoppingList.pendingItems.find(item => item.id === itemId);
-                setShoppingList(prev => ({
-                    ...prev,
-                    pendingItems: prev.pendingItems.filter(item => item.id !== itemId),
-                    estimatedBudget: prev.estimatedBudget - (deletedItem?.estimatedPrice || 0)
-                }));
-            } else {
-                setShoppingList(prev => ({
-                    ...prev,
-                    boughtItems: prev.boughtItems.filter(item => item.id !== itemId)
-                }));
-            }
+            const deletedItem = shoppingList.pendingItems.find(item => item.id === itemId);
+            setShoppingList(prev => ({
+                ...prev,
+                pendingItems: prev.pendingItems.filter(item => item.id !== itemId),
+                estimatedBudget: prev.estimatedBudget - (deletedItem?.estimatedPrice || 0)
+            }));
 
             setSuccess(`"${itemName}" eliminado`);
             setTimeout(() => setSuccess(null), 2500);
@@ -794,18 +790,6 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                                                             {item.estimatedPrice.toFixed(2)}€ | Para: {getAssigneesLabel(item.assignedUserIds)}
                                                         </p>
                                                     </div>
-
-                                                    {/* Botón de Eliminar del historial */}
-                                                    <Button
-                                                        variant="danger"
-                                                        size="sm"
-                                                        onClick={() => handleDeleteItem(item.id, item.name, false)}
-                                                        disabled={loadingItemId === item.id}
-                                                        title="Eliminar del historial"
-                                                        className="p-1"
-                                                    >
-                                                        <IconTrash />
-                                                    </Button>
                                                 </div>
                                             ))}
                                         </div>

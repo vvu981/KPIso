@@ -34,14 +34,12 @@ import java.util.stream.Collectors;
 
 /**
  * Servicio de orquestación para la Lista de la Compra.
- * 
- * Implementa la lógica de negocio coordinando:
+ * * Implementa la lógica de negocio coordinando:
  * - Consultas al catálogo de productos (ProductCatalogClient)
  * - Estimación de precios (PriceEstimatorService)
  * - Persistencia de datos (ShoppingItemRepository)
  * - Caché local de productos (CachedProductRepository)
- * 
- * Sigue el principio de Responsabilidad Única (SOLID).
+ * * Sigue el principio de Responsabilidad Única (SOLID).
  */
 @Slf4j
 @Service
@@ -56,12 +54,12 @@ public class ShoppingListService {
     private final HouseMemberRepository houseMemberRepository;
 
     public ShoppingListService(ShoppingItemRepository shoppingItemRepository,
-                               ProductCatalogClient productCatalogClient,
-                               PriceEstimatorService priceEstimatorService,
-                               OpenFoodFactsAdapter openFoodFactsAdapter,
-                               CachedProductRepository cachedProductRepository,
-                               ExpenseService expenseService,
-                               HouseMemberRepository houseMemberRepository) {
+            ProductCatalogClient productCatalogClient,
+            PriceEstimatorService priceEstimatorService,
+            OpenFoodFactsAdapter openFoodFactsAdapter,
+            CachedProductRepository cachedProductRepository,
+            ExpenseService expenseService,
+            HouseMemberRepository houseMemberRepository) {
         this.shoppingItemRepository = shoppingItemRepository;
         this.productCatalogClient = productCatalogClient;
         this.priceEstimatorService = priceEstimatorService;
@@ -73,7 +71,8 @@ public class ShoppingListService {
 
     /**
      * Busca sugerencias de productos basándose en el término de búsqueda.
-     * Implementa un patrón de caché híbrido (Read-Through Cache) para optimizar el rendimiento.
+     * Implementa un patrón de caché híbrido (Read-Through Cache) para optimizar el
+     * rendimiento.
      */
     @Transactional
     public List<ProductSuggestionDto> searchProductSuggestions(String query) {
@@ -81,8 +80,9 @@ public class ShoppingListService {
 
         // 1. Intentar buscar en la caché local de base de datos
         List<CachedProduct> localProducts = cachedProductRepository.findTop8ByNameContainingIgnoreCase(query);
-        
-        // Si tenemos suficientes sugerencias locales (8), las devolvemos inmediatamente (Cache Hit)
+
+        // Si tenemos suficientes sugerencias locales (8), las devolvemos inmediatamente
+        // (Cache Hit)
         if (localProducts.size() >= 8) {
             log.debug("Cache Hit: Se encontraron sugerencias suficientes locales ({} productos)", localProducts.size());
             return localProducts.stream()
@@ -95,12 +95,14 @@ public class ShoppingListService {
                     .collect(Collectors.toList());
         }
 
-        log.debug("Cache Miss parcial: Se encontraron {} productos locales, consultando Open Food Facts", localProducts.size());
+        log.debug("Cache Miss parcial: Se encontraron {} productos locales, consultando Open Food Facts",
+                localProducts.size());
 
         // 2. Si no hay suficientes locales, consultar a la API externa
         List<ProductDetails> apiSuggestions = openFoodFactsAdapter.searchProductSuggestions(query);
 
-        // 3. Persistir en caché los productos devueltos por la API que no existan localmente
+        // 3. Persistir en caché los productos devueltos por la API que no existan
+        // localmente
         for (ProductDetails apiProduct : apiSuggestions) {
             if (apiProduct.isFound() && apiProduct.getName() != null && !apiProduct.getName().isBlank()) {
                 if (!cachedProductRepository.existsByNameIgnoreCase(apiProduct.getName().trim())) {
@@ -114,13 +116,15 @@ public class ShoppingListService {
                         cachedProductRepository.save(newCache);
                         log.debug("Producto guardado en caché de base de datos: {}", newCache.getName());
                     } catch (Exception e) {
-                        log.warn("No se pudo cachear el producto '{}' debido a un error: {}", newCache.getName(), e.getMessage());
+                        log.warn("No se pudo cachear el producto '{}' debido a un error: {}", newCache.getName(),
+                                e.getMessage());
                     }
                 }
             }
         }
 
-        // 4. Volver a consultar la base de datos para obtener el listado consolidado y actualizado (máximo 8)
+        // 4. Volver a consultar la base de datos para obtener el listado consolidado y
+        // actualizado (máximo 8)
         List<CachedProduct> consolidatedProducts = cachedProductRepository.findTop8ByNameContainingIgnoreCase(query);
 
         return consolidatedProducts.stream()
@@ -135,34 +139,44 @@ public class ShoppingListService {
 
     /**
      * Añade un nuevo producto a la lista de compra.
-     * 
-     * Proceso:
+     * * Proceso:
      * 1. Consulta Open Food Facts para obtener detalles normalizados del producto
+     * (aislado para no bloquear)
      * 2. Estima el precio basándose en la categoría
      * 3. Persiste el ítem en la base de datos
-     * 4. Almacena en caché local para enriquecer las futuras búsquedas de autocompletado
+     * 4. Almacena en caché local para enriquecer las futuras búsquedas de
+     * autocompletado
      */
     @Transactional
     public ShoppingItemResponse addShoppingItem(AddShoppingItemRequest request) {
-        log.info("Añadiendo ítem a la lista de compra para house: {} con producto: {}", 
+        log.info("Añadiendo ítem a la lista de compra para house: {} con producto: {}",
                 request.getHouseId(), request.getProductName());
 
-        // Obtener detalles del producto del catálogo externo
-        ProductDetails productDetails = productCatalogClient.searchProduct(request.getProductName());
+        // Aislar la llamada externa. Si la API falla, no impedimos que el usuario añada
+        // el producto manualmente.
+        ProductDetails productDetails = null;
+        try {
+            productDetails = productCatalogClient.searchProduct(request.getProductName());
+        } catch (Exception e) {
+            log.warn("El catálogo externo falló al buscar '{}'. Se registrará como entrada manual. Error: {}",
+                    request.getProductName(), e.getMessage());
+        }
 
         String productName = request.getProductName();
         String imageUrl = null;
         String categoryTags = null;
 
-        // Si se encontró el producto, usar sus detalles normalizados
+        // Si se encontró el producto y no hubo fallos de red, usar sus detalles
+        // normalizados
         if (productDetails != null && productDetails.isFound()) {
             productName = productDetails.getName();
             imageUrl = productDetails.getImageUrl();
             categoryTags = productDetails.getCategoryTags();
             log.debug("Producto encontrado en Open Food Facts: {}", productName);
-            
+
             // Auto-cachear el producto para búsquedas futuras si no existe
-            if (productName != null && !productName.isBlank() && !cachedProductRepository.existsByNameIgnoreCase(productName.trim())) {
+            if (productName != null && !productName.isBlank()
+                    && !cachedProductRepository.existsByNameIgnoreCase(productName.trim())) {
                 try {
                     CachedProduct newCache = CachedProduct.builder()
                             .name(productName.trim())
@@ -177,7 +191,7 @@ public class ShoppingListService {
                 }
             }
         } else {
-            log.debug("Producto no encontrado en Open Food Facts, usando búsqueda genérica");
+            log.debug("Producto no encontrado o fallo en el sistema externo, usando entrada manual");
         }
 
         // Estimar precio basándose en la categoría
@@ -251,7 +265,7 @@ public class ShoppingListService {
         log.info("Actualizando asignaciones para el ítem de compra: {} con usuarios: {}", itemId, assigneeIds);
         ShoppingItem item = shoppingItemRepository.findById(itemId)
                 .orElseThrow(() -> new IllegalArgumentException("El ítem no existe: " + itemId));
-        
+
         item.setAssignedUsers(assigneeIds);
         ShoppingItem updatedItem = shoppingItemRepository.save(item);
         return mapToResponse(updatedItem);
@@ -259,16 +273,22 @@ public class ShoppingListService {
 
     /**
      * Elimina un ítem de la lista de compra.
+     * Se bloquea la eliminación si el ítem ya está liquidado (historial intocable).
      */
     @Transactional
     public void deleteShoppingItem(UUID itemId) {
         log.info("Eliminando ítem de la lista de compra: {}", itemId);
 
-        if (!shoppingItemRepository.existsById(itemId)) {
-            throw new IllegalArgumentException("El ítem no existe: " + itemId);
+        ShoppingItem item = shoppingItemRepository.findById(itemId)
+                .orElseThrow(() -> new IllegalArgumentException("El ítem no existe: " + itemId));
+
+        // Validación crítica: Inmutabilidad financiera
+        if (ShoppingItemStatus.BOUGHT.equals(item.getStatus())) {
+            throw new IllegalStateException(
+                    "No se puede eliminar un producto que ya ha sido comprado y liquidado. El historial financiero es inmutable.");
         }
 
-        shoppingItemRepository.deleteById(itemId);
+        shoppingItemRepository.delete(item);
         log.info("Ítem eliminado exitosamente: {}", itemId);
     }
 
@@ -335,13 +355,16 @@ public class ShoppingListService {
 
     /**
      * Procesa el checkout de la lista de compra.
-     * Calcula los gastos proporcionales por participante y registra el gasto exacto.
+     * Calcula los gastos proporcionales por participante y registra el gasto
+     * exacto.
      */
     @Transactional
     public void checkoutShoppingList(CheckoutRequest request) {
-        log.info("Iniciando checkout de lista de compra para houseId: {} por importe real: {}", request.getHouseId(), request.getTotalRealAmount());
+        log.info("Iniciando checkout de lista de compra para houseId: {} por importe real: {}", request.getHouseId(),
+                request.getTotalRealAmount());
 
-        List<ShoppingItem> pendingItems = shoppingItemRepository.findByHouseIdAndStatusOrderByCreatedAtDesc(request.getHouseId(), ShoppingItemStatus.PENDING);
+        List<ShoppingItem> pendingItems = shoppingItemRepository
+                .findByHouseIdAndStatusOrderByCreatedAtDesc(request.getHouseId(), ShoppingItemStatus.PENDING);
 
         if (pendingItems.isEmpty()) {
             throw new IllegalStateException("No hay productos pendientes para hacer checkout");
@@ -368,11 +391,12 @@ public class ShoppingListService {
             BigDecimal proportion = estimated.divide(totalEstimated, 4, RoundingMode.HALF_UP);
             BigDecimal itemRealPrice = request.getTotalRealAmount().multiply(proportion);
 
-            List<UUID> usersForItem = (item.getAssignedUsers() == null || item.getAssignedUsers().isEmpty()) 
-                    ? allMemberIds 
+            List<UUID> usersForItem = (item.getAssignedUsers() == null || item.getAssignedUsers().isEmpty())
+                    ? allMemberIds
                     : item.getAssignedUsers();
 
-            BigDecimal pricePerUser = itemRealPrice.divide(BigDecimal.valueOf(usersForItem.size()), 2, RoundingMode.HALF_UP);
+            BigDecimal pricePerUser = itemRealPrice.divide(BigDecimal.valueOf(usersForItem.size()), 2,
+                    RoundingMode.HALF_UP);
 
             for (UUID userId : usersForItem) {
                 exactSplits.put(userId, exactSplits.getOrDefault(userId, BigDecimal.ZERO).add(pricePerUser));
@@ -395,7 +419,7 @@ public class ShoppingListService {
                 .build();
 
         expenseService.createExpense(expenseRequest);
-        
+
         log.info("Checkout completado exitosamente y gasto registrado.");
     }
 }
