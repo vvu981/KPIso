@@ -197,12 +197,20 @@ public class ShoppingListService {
         // Estimar precio basándose en la categoría
         Double estimatedPrice = priceEstimatorService.estimatePrice(categoryTags);
 
+        // Permitir sobreescritura manual desde la petición: si viene un manualPrice
+        // válido (>0), usarlo.
+        Double finalPrice = estimatedPrice;
+        if (request.getManualPrice() != null && request.getManualPrice() > 0) {
+            finalPrice = request.getManualPrice();
+            log.debug("Usando precio manual proporcionado: {} para producto {}", finalPrice, productName);
+        }
+
         // Crear y persistir el ítem
         ShoppingItem item = ShoppingItem.builder()
                 .houseId(request.getHouseId())
                 .addedById(request.getAddedById())
                 .name(productName)
-                .estimatedPrice(estimatedPrice)
+                .estimatedPrice(finalPrice)
                 .imageUrl(imageUrl)
                 .status(ShoppingItemStatus.PENDING)
                 .assignedUsers(request.getAssignedUserIds() != null ? request.getAssignedUserIds() : new ArrayList<>())

@@ -67,10 +67,7 @@ public class TaskService {
             createdTasks.add(taskRepository.save(task));
 
         } else {
-            // Arquitectura sólida: En lugar de crear N tareas futuras de golpe, solo
-            // inicializamos la primera.
-            // El motor cronizado se encargará de rotarla independientemente del ciclo de
-            // vida del usuario inicial.
+            // Opción B: proyectar y persistir N ocurrencias encadenadas via nextTaskId
             List<HouseMember> activeMembers = houseMemberRepository.findByHouseId(request.getHouseId())
                     .stream()
                     .filter(HouseMember::isActive)
@@ -80,24 +77,89 @@ public class TaskService {
                 throw new IllegalArgumentException("No hay miembros activos para asignar la tarea");
             }
 
-            User firstAssignee = activeMembers.get(0).getUser();
-            if (request.getAssignedToId() != null) {
-                firstAssignee = userRepository.findById(request.getAssignedToId())
-                        .orElse(firstAssignee);
+            // Preparar la lista de fechas según el tipo de rotación y specificDays
+            int occurrences = request.getOccurrencesToProject() != null ? request.getOccurrencesToProject() : 1;
+            List<LocalDateTime> dates = new ArrayList<>();
+
+            if (request.getRotationType() == RotationType.DAILY) {
+                for (int i = 0; i < occurrences; i++) {
+                    dates.add(currentDate.plusDays(i));
+                }
+            } else if (request.getRotationType() == RotationType.WEEKLY) {
+                // specificDays: list of DayOfWeek values (1=Monday...7=Sunday) expected
+                List<Integer> specific = request.getSpecificDays();
+                if (specific == null || specific.isEmpty()) {
+                    // fallback: same weekday as startDate
+                    int weekday = currentDate.getDayOfWeek().getValue();
+                    specific = List.of(weekday);
+                }
+                LocalDateTime cursor = currentDate;
+                while (dates.size() < occurrences) {
+                    if (specific.contains(cursor.getDayOfWeek().getValue())) {
+                        dates.add(cursor);
+                    }
+                    cursor = cursor.plusDays(1);
+                }
+            } else if (request.getRotationType() == RotationType.MONTHLY) {
+                for (int i = 0; i < occurrences; i++) {
+                    dates.add(currentDate.plusMonths(i));
+                }
+            } else {
+                // default to daily
+                for (int i = 0; i < occurrences; i++) {
+                    dates.add(currentDate.plusDays(i));
+                }
             }
 
-            Task task = Task.builder()
-                    .title(request.getTitle())
-                    .description(request.getDescription())
-                    .points(request.getPoints())
-                    .status(TaskStatus.PENDING)
-                    .rotationType(request.getRotationType())
-                    .dueDate(currentDate)
-                    .house(house)
-                    .assignedTo(firstAssignee)
-                    .build();
+            // Determinar asignación rotativa entre participantes o miembros activos
+            List<User> participants = new ArrayList<>();
+            if (request.getParticipantIds() != null && !request.getParticipantIds().isEmpty()) {
+                for (UUID uid : request.getParticipantIds()) {
+                    User u = userRepository.findById(uid)
+                            .orElseThrow(() -> new IllegalArgumentException("El usuario no pertenece a esta casa"));
+                    participants.add(u);
+                }
+            } else {
+                // usar todos los miembros activos
+                for (HouseMember hm : activeMembers)
+                    participants.add(hm.getUser());
+            }
 
-            createdTasks.add(taskRepository.save(task));
+            if (participants.isEmpty()) {
+                throw new IllegalArgumentException("No se pueden crear tareas rotativas sin participantes");
+            }
+
+            // Crear tareas y encadenarlas
+            Task previous = null;
+            for (int i = 0; i < dates.size(); i++) {
+                LocalDateTime due = dates.get(i);
+                User assignee = participants.get(i % participants.size());
+
+                String title = request.getTitle();
+                if (occurrences > 1)
+                    title = String.format("%s (Turno %d)", request.getTitle(), i + 1);
+
+                Task t = Task.builder()
+                        .title(title)
+                        .description(request.getDescription())
+                        .points(request.getPoints())
+                        .status(TaskStatus.PENDING)
+                        .rotationType(request.getRotationType())
+                        .dueDate(due)
+                        .house(house)
+                        .assignedTo(assignee)
+                        .build();
+
+                Task saved = taskRepository.save(t);
+                createdTasks.add(saved);
+
+                if (previous != null) {
+                    // enlazar previous -> saved
+                    previous.setNextTaskId(saved.getId());
+                    taskRepository.save(previous);
+                }
+                previous = saved;
+            }
         }
 
         return createdTasks.stream().map(this::mapToResponse).collect(Collectors.toList());

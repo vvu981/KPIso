@@ -78,6 +78,9 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
     const [checkoutPayer, setCheckoutPayer] = useState(currentUserId);
     const [checkoutLoading, setCheckoutLoading] = useState(false);
     const [openDropdownId, setOpenDropdownId] = useState(null);
+    const [manualMode, setManualMode] = useState(false);
+    const [manualName, setManualName] = useState('');
+    const [manualPrice, setManualPrice] = useState('');
 
     const getAssigneesLabel = (assignedUserIds) => {
         if (!assignedUserIds || assignedUserIds.length === 0 || assignedUserIds.length === houseMembers.length) {
@@ -201,7 +204,7 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
      */
     const handleAddProduct = async (e, suggestion = null) => {
         e?.preventDefault();
-        const productName = suggestion ? suggestion.name : productInput.trim();
+        const productName = suggestion ? suggestion.name : (manualMode ? manualName.trim() : productInput.trim());
         if (!productName) {
             setError('Por favor escribe un nombre de producto');
             return;
@@ -211,12 +214,17 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
         setSuccess(null);
         setShowSuggestions(false);
         try {
-            const response = await api.post('/shopping-list/add', {
+            const payload = {
                 productName: productName,
                 houseId: houseId,
                 addedById: currentUserId,
                 assignedUserIds: []
-            }, {
+            };
+            if (manualMode && manualPrice && !isNaN(parseFloat(manualPrice))) {
+                payload.manualPrice = parseFloat(manualPrice);
+            }
+
+            const response = await api.post('/shopping-list/add', payload, {
                 headers: token ? { Authorization: `Bearer ${token}` } : {}
             });
             setShoppingList(prev => ({
@@ -225,6 +233,9 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                 estimatedBudget: prev.estimatedBudget + (response.data.estimatedPrice || 0)
             }));
             setProductInput('');
+            setManualName('');
+            setManualPrice('');
+            setManualMode(false);
             setSuccess(`Producto añadido a la lista`);
             setTimeout(() => setSuccess(null), 3000);
         } catch (err) {
@@ -539,7 +550,15 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                                     </div>
                                 )}
                             </div>
-                            <Button
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setManualMode(!manualMode)}
+                                    className={`px-3 py-1.5 rounded-md border text-sm font-medium ${manualMode ? 'bg-gray-100' : 'bg-white'}`}
+                                >
+                                    {manualMode ? 'Modo Manual' : 'Autocompletar'}
+                                </button>
+                                <Button
                                 type="submit"
                                 disabled={loading || !productInput.trim()}
                                 className="flex items-center gap-2 whitespace-nowrap"
@@ -547,8 +566,41 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                                 <IconPlus />
                                 Añadir
                             </Button>
+                            </div>
                         </div>
                     </form>
+
+                    {/* Formulario Manual Extra */}
+                    {manualMode && (
+                        <form onSubmit={handleAddProduct} className="mt-3">
+                            <div className="flex gap-3">
+                                <Input
+                                    type="text"
+                                    placeholder="Nombre del producto"
+                                    value={manualName}
+                                    onChange={(e) => { setManualName(e.target.value); setProductInput(e.target.value); }}
+                                    disabled={loading}
+                                />
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    placeholder="Precio (€) opcional"
+                                    value={manualPrice}
+                                    onChange={(e) => setManualPrice(e.target.value)}
+                                    disabled={loading}
+                                />
+                                <Button
+                                    type="submit"
+                                    disabled={loading || !manualName.trim()}
+                                    className="flex items-center gap-2 whitespace-nowrap"
+                                >
+                                    <IconPlus />
+                                    Añadir Manual
+                                </Button>
+                            </div>
+                        </form>
+                    )}
                 </div>
             </Card>
 
@@ -570,14 +622,18 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                             >
                                 {/* Imagen del Producto */}
                                 <div className="flex-shrink-0">
-                                    <img
-                                        src={item.imageUrl || 'https://via.placeholder.com/150?text=NoImage'}
-                                        alt={item.name}
-                                        className="w-16 h-16 object-cover rounded-md bg-gray-100 border border-gray-200"
-                                        onError={(e) => {
-                                            e.target.src = 'https://via.placeholder.com/150?text=NoImage';
-                                        }}
-                                    />
+                                    {item.imageUrl && item.imageUrl.trim() ? (
+                                        <img
+                                            src={item.imageUrl}
+                                            alt={item.name}
+                                            className="w-16 h-16 object-cover rounded-md bg-gray-100 border border-gray-200"
+                                            onError={(e) => { e.target.style.display = 'none'; }}
+                                        />
+                                    ) : (
+                                        <div className="w-16 h-16 flex items-center justify-center rounded-md bg-indigo-500 text-white font-bold text-xl">
+                                            {item.name && item.name.charAt(0).toUpperCase()}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Información del Producto */}
@@ -767,21 +823,35 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                                                     className="flex items-center gap-3 opacity-75 hover:opacity-100 transition-opacity"
                                                 >
                                                     {/* Mini imagen del Producto */}
-                                                    <img
-                                                        src={item.imageUrl || 'https://via.placeholder.com/150?text=NoImage'}
-                                                        alt={item.name}
-                                                        style={{
+                                                    {item.imageUrl && item.imageUrl.trim() ? (
+                                                        <img
+                                                            src={item.imageUrl}
+                                                            alt={item.name}
+                                                            style={{
+                                                                width: '40px',
+                                                                height: '40px',
+                                                                objectFit: 'cover',
+                                                                borderRadius: 'var(--radius-md)',
+                                                                backgroundColor: 'var(--bg-elevated)',
+                                                                border: '1px solid var(--border-subtle)'
+                                                            }}
+                                                            onError={(e) => { e.target.style.display = 'none'; }}
+                                                        />
+                                                    ) : (
+                                                        <div style={{
                                                             width: '40px',
                                                             height: '40px',
-                                                            objectFit: 'cover',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
                                                             borderRadius: 'var(--radius-md)',
-                                                            backgroundColor: 'var(--bg-elevated)',
-                                                            border: '1px solid var(--border-subtle)'
-                                                        }}
-                                                        onError={(e) => {
-                                                            e.target.src = 'https://via.placeholder.com/150?text=NoImage';
-                                                        }}
-                                                    />
+                                                            backgroundColor: 'var(--accent)',
+                                                            color: 'white',
+                                                            fontWeight: '700'
+                                                        }}>
+                                                            {item.name && item.name.charAt(0).toUpperCase()}
+                                                        </div>
+                                                    )}
                                                     <div className="flex-grow min-w-0">
                                                         <p className="font-medium text-sm truncate line-through" style={{ color: 'var(--text-primary)' }}>
                                                             {item.name}
