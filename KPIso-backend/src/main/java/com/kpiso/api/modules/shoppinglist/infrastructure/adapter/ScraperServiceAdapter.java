@@ -63,9 +63,9 @@ public class ScraperServiceAdapter implements ProductCatalogClient {
 
     /**
      * Busca múltiples sugerencias de productos consultando kpiso-scraper.
-     * Si el servicio no responde o devuelve vacío, usa OpenFoodFactsAdapter como fallback.
+     * Si el servicio no responde o devuelve vacío, usa OpenFoodFactsAdapter como fallback si useFallback es verdadero.
      */
-    public List<ProductDetails> searchProductSuggestions(String query) {
+    public List<ProductDetails> searchProductSuggestions(String query, boolean useFallback) {
         try {
             String encodedQuery = URLEncoder.encode(query.trim(), StandardCharsets.UTF_8);
             String url = scraperBaseUrl + "/products?q=" + encodedQuery;
@@ -80,16 +80,24 @@ public class ScraperServiceAdapter implements ProductCatalogClient {
                 return results;
             }
 
-            log.debug("Scraper devolvió vacío para '{}', usando fallback OpenFoodFacts", query);
+            log.debug("Scraper devolvió vacío para '{}'", query);
 
         } catch (RestClientException e) {
-            log.warn("kpiso-scraper no disponible para '{}': {}. Usando fallback.", query, e.getMessage());
+            log.warn("kpiso-scraper no disponible para '{}': {}.", query, e.getMessage());
         } catch (Exception e) {
             log.error("Error inesperado consultando kpiso-scraper para '{}': {}", query, e.getMessage());
         }
 
-        // Fallback: delegar a OpenFoodFactsAdapter
-        return fallbackAdapter.searchProductSuggestions(query);
+        if (useFallback) {
+            log.info("Usando fallback de OpenFoodFacts para '{}'", query);
+            return fallbackAdapter.searchProductSuggestions(query);
+        }
+
+        return new ArrayList<>();
+    }
+
+    public List<ProductDetails> searchProductSuggestions(String query) {
+        return searchProductSuggestions(query, false);
     }
 
     /**

@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Configuración
 # ---------------------------------------------------------------------------
-DATA_DIR = Path(os.getenv("DATA_DIR", "/app/data"))
+DATA_DIR = Path(os.getenv("DATA_DIR", "./data"))
 PRODUCTS_FILE = DATA_DIR / "products.json"
 OFF_BASE_URL = "https://world.openfoodfacts.org/cgi/search.pl"
 DEFAULT_IMAGE = "https://via.placeholder.com/150?text=No+Image"
@@ -47,6 +47,19 @@ SEED_TERMS: list[str] = [
     "chocolate", "galletas", "cereales", "avena", "miel",
     "ketchup", "mayonesa", "mostaza", "vinagre", "pimienta",
     "jabón", "champú", "papel higiénico", "detergente",
+    "fruta", "verdura", "bebidas", "embutido", "pescado", "carne",
+    "legumbres", "frutos secos", "semillas", "panadería", "pastelería",
+    "postres", "helados", "chocolates", "chucherías", "snacks",
+    "patatas fritas", "refrescos", "zumos", "bebidas vegetales",
+    "crema", "margarina", "aceite", "patatas", "pimientos",
+    "aguacate", "limón", "jengibre", "cilantro", "perejil",
+    "albahaca", "orégano", "romero", "tomillo", 
+    "carne de cerdo", "filete de ternera", "pechuga de pollo", 
+  "lomo de salmón", "lomo de bacalao", "filete de lenguado", 
+  "merluza", "lubina", "dorada", "gambas", "langostinos", 
+  "mejillones", "almejas", "calamares", "pulpo", "sepia",
+  "pavo", "cordero", "cerdo", "ternera", "pollo", "pescado",
+  
 ]
 
 

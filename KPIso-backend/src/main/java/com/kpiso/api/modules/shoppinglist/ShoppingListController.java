@@ -11,6 +11,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.web.server.ResponseStatusException;
+
 import java.util.List;
 import java.util.UUID;
 
@@ -42,17 +44,22 @@ public class ShoppingListController {
      * Devuelve una lista de productos con nombre, imagen, categoría y precio estimado.
      */
     @GetMapping("/search")
-    public ResponseEntity<List<ProductSuggestionDto>> searchProductSuggestions(@RequestParam String query) {
-        log.info("GET /shopping-list/search - Buscando sugerencias para: {}", query);
+    public ResponseEntity<?> searchProductSuggestions(
+            @RequestParam String query,
+            @RequestParam(required = false, defaultValue = "false") boolean useFallback) {
+        log.info("GET /shopping-list/search - Buscando sugerencias para: {} (useFallback: {})", query, useFallback);
         try {
             if (query == null || query.trim().isEmpty()) {
                 return ResponseEntity.badRequest().build();
             }
-            List<ProductSuggestionDto> suggestions = shoppingListService.searchProductSuggestions(query.trim());
+            List<ProductSuggestionDto> suggestions = shoppingListService.searchProductSuggestions(query.trim(), useFallback);
             return ResponseEntity.ok(suggestions);
+        } catch (ResponseStatusException e) {
+            log.warn("Error de estado HTTP al buscar sugerencias: {} - {}", e.getStatusCode(), e.getReason());
+            return ResponseEntity.status(e.getStatusCode()).body(e.getReason());
         } catch (Exception e) {
             log.error("Error al buscar sugerencias de productos", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error al procesar la búsqueda");
         }
     }
 

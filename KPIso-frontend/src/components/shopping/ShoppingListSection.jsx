@@ -64,6 +64,8 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
     const [suggestions, setSuggestions] = useState([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [searchLoading, setSearchLoading] = useState(false);
+    const [hasSearchedExternal, setHasSearchedExternal] = useState(false);
+    const [externalSearchError, setExternalSearchError] = useState(null);
     const [shoppingList, setShoppingList] = useState({
         pendingItems: [],
         boughtItems: [],
@@ -88,6 +90,75 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
     const [showQuantityModal, setShowQuantityModal] = useState(false);
     const [selectedQuantity, setSelectedQuantity] = useState(1);
 
+    // Grupos expandidos en la lista pendiente (Set de nombres de grupo normalizados)
+    const [expandedGroups, setExpandedGroups] = useState(new Set());
+    // openGroupDropdown: id del dropdown de asignación de grupo abierto
+    const [openGroupDropdown, setOpenGroupDropdown] = useState(null);
+
+    /**
+     * Calcula el modo de asignación de un grupo de items:
+     * 'all'    → Todos (assignedUserIds vacío)
+     * 'single' → un único usuario (todos los items apuntan al mismo userId)
+     * 'custom' → Personalizado (distinto por item)
+     * Devuelve { mode, userId } donde userId solo aplica a 'single'.
+     */
+    const getGroupAssignmentMode = (groupItems) => {
+        const allEmpty = groupItems.every(i => !i.assignedUserIds || i.assignedUserIds.length === 0);
+        if (allEmpty) return { mode: 'all', userId: null };
+        const firstIds = groupItems[0].assignedUserIds || [];
+        if (firstIds.length === 1) {
+            const singleId = firstIds[0];
+            const allSame = groupItems.every(
+                i => i.assignedUserIds?.length === 1 && i.assignedUserIds[0] === singleId
+            );
+            if (allSame) return { mode: 'single', userId: singleId };
+        }
+        return { mode: 'custom', userId: null };
+    };
+
+    /**
+     * Aplica un modo de asignación a todos los items de un grupo via API.
+     * mode: 'all' | 'single' | 'custom'
+     * userId: solo requerido para mode='single'
+     */
+    const handleSetGroupAssignment = async (groupItems, mode, userId = null) => {
+        try {
+            const targetIds = groupItems.map(i => i.id);
+            let assigneeIds = [];
+            if (mode === 'single') {
+                assigneeIds = [userId];
+            }
+            
+            // Realizar peticiones en paralelo para actualizar cada item
+            await Promise.all(
+                targetIds.map(itemId => 
+                    api.put(`/shopping-list/${itemId}/assignees`, assigneeIds, {
+                        headers: token ? { Authorization: `Bearer ${token}` } : {}
+                    })
+                )
+            );
+            
+            // Recargar la lista para reflejar los cambios
+            loadShoppingList();
+            setSuccess("Asignación de grupo actualizada correctamente.");
+            setTimeout(() => setSuccess(null), 2500);
+        } catch (err) {
+            console.error("Error al actualizar asignaciones del grupo:", err);
+            setError("No se pudo actualizar la asignación del grupo.");
+        } finally {
+            setOpenGroupDropdown(null);
+        }
+    };
+
+    /** Toggle de expansión de un grupo */
+    const toggleGroup = (groupKey) => {
+        setExpandedGroups(prev => {
+            const next = new Set(prev);
+            next.has(groupKey) ? next.delete(groupKey) : next.add(groupKey);
+            return next;
+        });
+    };
+
     const getAssigneesLabel = (assignedUserIds) => {
         if (!assignedUserIds || assignedUserIds.length === 0 || assignedUserIds.length === houseMembers.length) {
             return 'Todos';
@@ -100,31 +171,62 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
         return `${assignedNames[0]} y ${assignedNames.length - 1} más`;
     };
 
-    // Cargar lista de compra al montar o cuando cambie houseId
+    // Cerrar dropdowns al hacer click fuera
     useEffect(() => {
-        loadShoppingList();
-    }, [houseId]);
+        const handleOutsideClick = (e) => {
+            if (openGroupDropdown && !e.target.closest('.group-assign-dropdown-container')) {
+                setOpenGroupDropdown(null);
+            }
+            if (openDropdownId && !e.target.closest('.assignee-dropdown-container')) {
+                setOpenDropdownId(null);
+            }
+            // Cerrar sugerencias al hacer click fuera
+            if (showSuggestions && inputWrapperRef.current && !inputWrapperRef.current.contains(e.target)) {
+                setShowSuggestions(false);
+            }
+        };
 
-    // Actualizar coordenadas del dropdown cuando se muestra o está cargando
-    useEffect(() => {
-        if ((showSuggestions || searchLoading) && inputWrapperRef.current) {
+        document.addEventListener('click', handleOutsideClick);
+        return () => {
+            document.removeEventListener('click', handleOutsideClick);
+        };
+    }, [openGroupDropdown, openDropdownId, showSuggestions]);
+
+    // Recalcular coordenadas del dropdown de sugerencias al cambiar tamaño de ventana o hacer scroll
+    const updateDropdownCoords = () => {
+        if (inputWrapperRef.current) {
             const rect = inputWrapperRef.current.getBoundingClientRect();
             setDropdownCoords({
-                top: rect.bottom + 4,
+                top: rect.bottom,
                 left: rect.left,
-                width: rect.width,
+                width: rect.width
             });
         }
-    }, [showSuggestions, searchLoading, suggestions]);
+    };
 
-    // Limpieza del temporizador de búsqueda al desmontar el componente
     useEffect(() => {
+        if (showSuggestions) {
+            updateDropdownCoords();
+            window.addEventListener('resize', updateDropdownCoords);
+            window.addEventListener('scroll', updateDropdownCoords, true);
+        }
+        return () => {
+            window.removeEventListener('resize', updateDropdownCoords);
+            window.removeEventListener('scroll', updateDropdownCoords, true);
+        };
+    }, [showSuggestions]);
+
+    // Cargar datos al inicio
+    useEffect(() => {
+        if (houseId) {
+            loadShoppingList();
+        }
         return () => {
             if (searchTimeoutRef.current) {
                 clearTimeout(searchTimeoutRef.current);
             }
         };
-    }, []);
+    }, [houseId]);
 
     /**
      * Busca sugerencias de productos mientras el usuario escribe
@@ -141,6 +243,8 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
             setSuggestions([]);
             setShowSuggestions(false);
             setSearchLoading(false);
+            setHasSearchedExternal(false);
+            setExternalSearchError(null);
             return;
         }
 
@@ -156,7 +260,9 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                 });
 
                 setSuggestions(response.data.slice(0, 8));
-                setShowSuggestions(response.data.length > 0);
+                setHasSearchedExternal(false); // Restablecer
+                setExternalSearchError(null);
+                setShowSuggestions(true); // Mostrar contenedor de sugerencias
             } catch (err) {
                 console.error('Error al buscar sugerencias:', err);
                 setSuggestions([]);
@@ -168,6 +274,32 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
     };
 
     /**
+     * Realiza una búsqueda forzada en la API externa de OpenFoodFacts (fallback)
+     */
+    const handleSearchExternal = async () => {
+        if (!productInput.trim()) return;
+        setSearchLoading(true);
+        setError(null);
+        setExternalSearchError(null);
+        try {
+            const response = await api.get(`/shopping-list/search?query=${encodeURIComponent(productInput.trim())}&useFallback=true`, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {}
+            });
+            setSuggestions(response.data.slice(0, 8));
+            setHasSearchedExternal(true);
+            setShowSuggestions(true);
+        } catch (err) {
+            console.error('Error al buscar sugerencias externas:', err);
+            const errMsg = err.response?.data || 'Error al consultar la API externa.';
+            setExternalSearchError(errMsg);
+            setHasSearchedExternal(true);
+            setShowSuggestions(true);
+        } finally {
+            setSearchLoading(false);
+        }
+    };
+
+    /**
      * Limpia el buscador y restablece el estado de sugerencias
      */
     const handleClearSearch = () => {
@@ -175,6 +307,8 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
         setSuggestions([]);
         setShowSuggestions(false);
         setSearchLoading(false);
+        setHasSearchedExternal(false);
+        setExternalSearchError(null);
         if (searchTimeoutRef.current) {
             clearTimeout(searchTimeoutRef.current);
         }
@@ -551,7 +685,7 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                                 )}
 
                                 {/* Dropdown de Sugerencias — fixed para escapar del overflow:hidden de la Card */}
-                                {showSuggestions && suggestions.length > 0 && (
+                                {showSuggestions && (
                                     <div
                                         style={{
                                             position: 'fixed',
@@ -567,47 +701,86 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                                             overflowY: 'auto',
                                         }}
                                     >
-                                        {suggestions.map((suggestion, idx) => (
-                                            <button
-                                                key={idx}
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    handleSuggestionClick(suggestion);
-                                                }}
-                                                style={{
-                                                    width: '100%',
-                                                    textAlign: 'left',
-                                                    padding: '10px 14px',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '12px',
-                                                    background: 'transparent',
-                                                    border: 'none',
-                                                    borderBottom: '1px solid var(--border-subtle)',
-                                                    cursor: 'pointer',
-                                                    transition: 'background 0.15s',
-                                                    color: 'var(--text-primary)',
-                                                }}
-                                                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-elevated)'}
-                                                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                                            >
-                                                <img
-                                                    src={suggestion.imageUrl}
-                                                    alt={suggestion.name}
-                                                    style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 'var(--radius-md)', background: 'var(--bg-elevated)', flexShrink: 0 }}
-                                                    onError={(e) => { e.target.src = 'https://via.placeholder.com/40?text=?'; }}
-                                                />
-                                                <div style={{ flexGrow: 1, minWidth: 0 }}>
-                                                    <p style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>
-                                                        {suggestion.name}
+                                        {suggestions.length > 0 ? (
+                                            suggestions.map((suggestion, idx) => (
+                                                <button
+                                                    key={idx}
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        handleSuggestionClick(suggestion);
+                                                    }}
+                                                    style={{
+                                                        width: '100%',
+                                                        textAlign: 'left',
+                                                        padding: '10px 14px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '12px',
+                                                        background: 'transparent',
+                                                        border: 'none',
+                                                        borderBottom: '1px solid var(--border-subtle)',
+                                                        cursor: 'pointer',
+                                                        transition: 'background 0.15s',
+                                                        color: 'var(--text-primary)',
+                                                    }}
+                                                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-elevated)'}
+                                                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                                >
+                                                    <img
+                                                        src={suggestion.imageUrl}
+                                                        alt={suggestion.name}
+                                                        style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 'var(--radius-md)', background: 'var(--bg-elevated)', flexShrink: 0 }}
+                                                        onError={(e) => { e.target.src = 'https://via.placeholder.com/40?text=?'; }}
+                                                    />
+                                                    <div style={{ flexGrow: 1, minWidth: 0 }}>
+                                                        <p style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>
+                                                            {suggestion.name}
+                                                        </p>
+                                                        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', margin: 0 }}>
+                                                            Est. {suggestion.estimatedPrice.toFixed(2)}€
+                                                        </p>
+                                                    </div>
+                                                </button>
+                                            ))
+                                        ) : (
+                                            <div style={{ padding: '16px', textAlign: 'center' }}>
+                                                {externalSearchError ? (
+                                                    <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: '#ef4444', fontWeight: 500 }}>
+                                                        ⚠️ {externalSearchError}
                                                     </p>
-                                                    <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', margin: 0 }}>
-                                                        Est. {suggestion.estimatedPrice.toFixed(2)}€
+                                                ) : !hasSearchedExternal ? (
+                                                    <>
+                                                        <p style={{ margin: '0 0 12px 0', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
+                                                            No se ha encontrado el producto en el catálogo local.
+                                                        </p>
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleSearchExternal}
+                                                            style={{
+                                                                background: 'var(--brand-primary, #4f46e5)',
+                                                                color: 'white',
+                                                                border: 'none',
+                                                                padding: '8px 14px',
+                                                                borderRadius: 'var(--radius-md, 6px)',
+                                                                cursor: 'pointer',
+                                                                fontSize: 'var(--text-xs)',
+                                                                fontWeight: 'bold',
+                                                                transition: 'opacity 0.2s'
+                                                            }}
+                                                            onMouseEnter={e => e.currentTarget.style.opacity = '0.9'}
+                                                            onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                                                        >
+                                                            Buscar en Open Food Facts
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
+                                                        No se encontraron resultados en la API externa tampoco.
                                                     </p>
-                                                </div>
-                                            </button>
-                                        ))}
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 
@@ -689,135 +862,309 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
 
 
 
-            {/* Lista de Productos Pendientes */}
-            {shoppingList.pendingItems.length > 0 ? (
-                <Card>
-                    <div className="p-5 border-b border-gray-200">
-                        <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-                            Productos por Comprar ({shoppingList.pendingItems.length})
-                        </h3>
-                    </div>
-                    <div className="divide-y divide-gray-200">
-                        {shoppingList.pendingItems.map(item => (
-                            <div
-                                key={item.id}
-                                className="p-4 hover:bg-gray-50 transition-colors flex items-center gap-4"
-                            >
-                                {/* Imagen del Producto */}
-                                <div className="flex-shrink-0">
-                                    {item.imageUrl && item.imageUrl.trim() ? (
-                                        <img
-                                            src={item.imageUrl}
-                                            alt={item.name}
-                                            className="w-16 h-16 object-cover rounded-md bg-gray-100 border border-gray-200"
-                                            onError={(e) => { e.target.style.display = 'none'; }}
-                                        />
-                                    ) : (
-                                        <div className="w-16 h-16 flex items-center justify-center rounded-md bg-indigo-500 text-white font-bold text-xl">
-                                            {item.name && item.name.charAt(0).toUpperCase()}
-                                        </div>
-                                    )}
-                                </div>
+            {/* Lista de Productos Pendientes — agrupada por nombre */}
+            {shoppingList.pendingItems.length > 0 ? (() => {
+                // Agrupar items por nombre (case-insensitive)
+                const groupMap = {};
+                shoppingList.pendingItems.forEach(item => {
+                    const key = item.name.trim().toLowerCase();
+                    if (!groupMap[key]) groupMap[key] = { key, items: [] };
+                    groupMap[key].items.push(item);
+                });
+                const groups = Object.values(groupMap);
 
-                                {/* Información del Producto */}
-                                <div className="flex-grow min-w-0">
-                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                        <div>
-                                            <p className="font-medium truncate text-base" style={{ color: 'var(--text-primary)' }}>
-                                                {item.name}
-                                            </p>
-                                            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                                                Estimado: <span className="font-semibold text-blue-600">{item.estimatedPrice.toFixed(2)}€</span>
-                                            </p>
-                                        </div>
+                return (
+                    <Card>
+                        <div className="p-5 border-b border-gray-200">
+                            <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+                                Productos por Comprar ({shoppingList.pendingItems.length})
+                            </h3>
+                        </div>
+                        <div className="divide-y divide-gray-200">
+                            {groups.map(group => {
+                                const rep = group.items[0]; // representante del grupo
+                                const qty = group.items.length;
+                                const isExpanded = expandedGroups.has(group.key);
+                                const { mode: assignMode, userId: assignUserId } = getGroupAssignmentMode(group.items);
+                                const totalEst = group.items.reduce((s, i) => s + (i.estimatedPrice || 0), 0);
+                                const isGroupDropOpen = openGroupDropdown === group.key;
 
-                                        {/* Selector de convivientes asignados al producto */}
-                                        <div className="relative flex items-center gap-1.5 mt-2 md:mt-0">
-                                            <span className="text-xs text-gray-500 font-medium">Para:</span>
-                                            <div className="relative">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setOpenDropdownId(openDropdownId === item.id ? null : item.id)}
-                                                    className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 focus:outline-none transition-colors"
-                                                >
-                                                    <span className="truncate max-w-[120px]">{getAssigneesLabel(item.assignedUserIds)}</span>
-                                                    <IconChevronDown />
-                                                </button>
+                                const assignLabel = assignMode === 'all'
+                                    ? 'Todos'
+                                    : assignMode === 'single'
+                                        ? (houseMembers.find(m => m.userId === assignUserId)?.username || 'Usuario')
+                                        : 'Personalizado';
 
-                                                {openDropdownId === item.id && (
-                                                    <>
-                                                        <div 
-                                                            style={{ position: 'fixed', inset: 0, zIndex: 40 }} 
-                                                            onClick={() => setOpenDropdownId(null)}
-                                                        />
-                                                        <div 
-                                                            className="absolute right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-2 min-w-[180px] z-50 flex flex-col gap-1"
-                                                        >
-                                                            <div className="px-2 py-1 text-[10px] uppercase tracking-wider font-semibold text-gray-400 border-b border-gray-100 mb-1">
-                                                                Asignar a:
-                                                            </div>
-                                                            {houseMembers.map(member => {
-                                                                const checked = !item.assignedUserIds || item.assignedUserIds.length === 0 || item.assignedUserIds.includes(member.userId);
-                                                                return (
-                                                                    <label 
-                                                                        key={member.userId} 
-                                                                        className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer text-xs select-none"
-                                                                    >
-                                                                        <input 
-                                                                            type="checkbox"
-                                                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
-                                                                            checked={checked}
-                                                                            onChange={() => handleToggleMember(item, member.userId)}
-                                                                        />
-                                                                        <span className="text-gray-700 font-medium">{member.username}</span>
-                                                                    </label>
-                                                                );
-                                                            })}
+                                return (
+                                    <div key={group.key}>
+                                        {/* Fila principal del grupo */}
+                                        <div className="p-4 flex items-center gap-4" style={{ background: 'var(--bg-surface)' }}>
+                                            {/* Imagen */}
+                                            <div className="flex-shrink-0">
+                                                {rep.imageUrl && rep.imageUrl.trim() ? (
+                                                    <img
+                                                        src={rep.imageUrl}
+                                                        alt={rep.name}
+                                                        className="w-14 h-14 object-cover rounded-md bg-gray-100 border border-gray-200"
+                                                        onError={e => { e.target.style.display = 'none'; }}
+                                                    />
+                                                ) : (
+                                                    <div className="w-14 h-14 flex items-center justify-center rounded-md bg-indigo-500 text-white font-bold text-xl">
+                                                        {rep.name && rep.name.charAt(0).toUpperCase()}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Info del grupo */}
+                                            <div className="flex-grow min-w-0">
+                                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                                    <div>
+                                                        <p className="font-semibold text-base truncate" style={{ color: 'var(--text-primary)' }}>
+                                                            {rep.name}
+                                                            {qty > 1 && (
+                                                                <span style={{
+                                                                    marginLeft: 8, fontSize: '0.75rem', fontWeight: 700,
+                                                                    background: 'var(--accent)', color: '#fff',
+                                                                    borderRadius: '999px', padding: '1px 8px',
+                                                                    verticalAlign: 'middle'
+                                                                }}>
+                                                                    ×{qty}
+                                                                </span>
+                                                            )}
+                                                        </p>
+                                                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                                                            Estimado: <span className="font-semibold text-blue-600">
+                                                                {qty > 1 ? `${totalEst.toFixed(2)}€ (${rep.estimatedPrice.toFixed(2)}€/ud.)` : `${rep.estimatedPrice.toFixed(2)}€`}
+                                                            </span>
+                                                        </p>
+                                                    </div>
+
+                                                    {/* Selector de asignación de grupo */}
+                                                    <div className="relative flex items-center gap-1.5">
+                                                        <span className="text-xs text-gray-500 font-medium">Para:</span>
+                                                        <div className="relative group-assign-dropdown-container">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setOpenGroupDropdown(isGroupDropOpen ? null : group.key);
+                                                                    setOpenDropdownId(null);
+                                                                }}
+                                                                className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 focus:outline-none transition-colors"
+                                                            >
+                                                                <span className="truncate max-w-[120px]">{assignLabel}</span>
+                                                                <IconChevronDown />
+                                                            </button>
+
+                                                            {isGroupDropOpen && (
+                                                                <>
+                                                                    <div
+                                                                        style={{ position: 'fixed', inset: 0, zIndex: 40 }}
+                                                                        onClick={() => setOpenGroupDropdown(null)}
+                                                                    />
+                                                                    <div className="absolute right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-2 min-w-[190px] z-50 flex flex-col gap-1">
+                                                                        <div className="px-2 py-1 text-[10px] uppercase tracking-wider font-semibold text-gray-400 border-b border-gray-100 mb-1">
+                                                                            Pagar por:
+                                                                        </div>
+                                                                        {/* Opción Todos */}
+                                                                        <button
+                                                                            type="button"
+                                                                            className={`flex items-center gap-2 px-2 py-1.5 rounded text-xs font-medium hover:bg-gray-50 w-full text-left transition-colors ${
+                                                                                assignMode === 'all' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700'
+                                                                            }`}
+                                                                            onClick={() => { handleSetGroupAssignment(group.items, 'all'); setOpenGroupDropdown(null); }}
+                                                                        >
+                                                                            <span style={{ width: 14, display: 'inline-block' }}>{assignMode === 'all' ? '✓' : ''}</span>
+                                                                            Todos (equitativo)
+                                                                        </button>
+                                                                        {/* Opción por usuario */}
+                                                                        {houseMembers.map(m => (
+                                                                            <button
+                                                                                key={m.userId}
+                                                                                type="button"
+                                                                                className={`flex items-center gap-2 px-2 py-1.5 rounded text-xs font-medium hover:bg-gray-50 w-full text-left transition-colors ${
+                                                                                    assignMode === 'single' && assignUserId === m.userId ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700'
+                                                                                }`}
+                                                                                onClick={() => { handleSetGroupAssignment(group.items, 'single', m.userId); setOpenGroupDropdown(null); }}
+                                                                            >
+                                                                                <span style={{ width: 14, display: 'inline-block' }}>
+                                                                                    {assignMode === 'single' && assignUserId === m.userId ? '✓' : ''}
+                                                                                </span>
+                                                                                {m.username}
+                                                                            </button>
+                                                                        ))}
+                                                                        {/* Opción Personalizado — solo visible si hay >1 item */}
+                                                                        {qty > 1 && (
+                                                                            <>
+                                                                                <div className="border-t border-gray-100 my-1" />
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className={`flex items-center gap-2 px-2 py-1.5 rounded text-xs font-medium hover:bg-gray-50 w-full text-left transition-colors ${
+                                                                                        assignMode === 'custom' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700'
+                                                                                    }`}
+                                                                                    onClick={() => {
+                                                                                        // Personalizado: simplemente expandir el grupo y cerrar dropdown
+                                                                                        setExpandedGroups(prev => { const n = new Set(prev); n.add(group.key); return n; });
+                                                                                        setOpenGroupDropdown(null);
+                                                                                    }}
+                                                                                >
+                                                                                    <span style={{ width: 14, display: 'inline-block' }}>{assignMode === 'custom' ? '✓' : ''}</span>
+                                                                                    Personalizado
+                                                                                </button>
+                                                                            </>
+                                                                        )}
+                                                                    </div>
+                                                                </>
+                                                            )}
                                                         </div>
-                                                    </>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Acciones del grupo */}
+                                            <div className="flex-shrink-0 flex items-center gap-2">
+                                                {/* Botón eliminar — solo si qty=1 */}
+                                                {qty === 1 && (
+                                                    <Button
+                                                        variant="danger"
+                                                        size="sm"
+                                                        onClick={() => handleDeleteItem(rep.id, rep.name, true)}
+                                                        disabled={loadingItemId === rep.id}
+                                                        title="Eliminar"
+                                                        className="flex items-center gap-1"
+                                                    >
+                                                        <IconTrash />
+                                                    </Button>
+                                                )}
+                                                {/* Botón expandir si hay >1 item */}
+                                                {qty > 1 && (
+                                                    <button
+                                                        type="button"
+                                                        title={isExpanded ? 'Colapsar' : 'Ver unidades'}
+                                                        onClick={() => toggleGroup(group.key)}
+                                                        style={{
+                                                            display: 'flex', alignItems: 'center', gap: 4,
+                                                            padding: '6px 10px', borderRadius: 'var(--radius-md)',
+                                                            border: '1px solid var(--border-default)',
+                                                            background: isExpanded ? 'var(--bg-elevated)' : 'transparent',
+                                                            color: 'var(--text-secondary)', cursor: 'pointer',
+                                                            fontSize: '0.75rem', fontWeight: 600,
+                                                            transition: 'background 0.15s',
+                                                        }}
+                                                    >
+                                                        {isExpanded ? <IconChevronUp /> : <IconChevronDown />}
+                                                    </button>
                                                 )}
                                             </div>
                                         </div>
-                                    </div>
-                                </div>
 
-                                {/* Botones de Acción */}
-                                <div className="flex-shrink-0 flex gap-2">
-                                    <Button
-                                        variant="danger"
-                                        size="sm"
-                                        onClick={() => handleDeleteItem(item.id, item.name, true)}
-                                        disabled={loadingItemId === item.id}
-                                        title="Eliminar"
-                                        className="flex items-center gap-1"
-                                    >
-                                        <IconTrash />
-                                    </Button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                    {/* Card Footer with Budget and Checkout Action */}
-                    <div className="p-5 bg-gray-50 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4">
-                        <div className="flex items-baseline gap-2">
-                            <span className="text-sm font-medium text-gray-500">Presupuesto Estimado:</span>
-                            <span className="text-2xl font-bold text-blue-600">
-                                {shoppingList.estimatedBudget.toFixed(2)}€
-                            </span>
-                            <span className="text-xs text-gray-400">
-                                ({shoppingList.pendingItems.length} {shoppingList.pendingItems.length === 1 ? 'producto' : 'productos'})
-                            </span>
+                                        {/* Subítems expandidos (modo Personalizado o manual) */}
+                                        {isExpanded && qty > 1 && (
+                                            <div style={{ background: 'var(--bg-base)', borderTop: '1px solid var(--border-subtle)' }}>
+                                                {group.items.map((item, idx) => (
+                                                    <div
+                                                        key={item.id}
+                                                        className="flex items-center gap-3 px-6 py-2.5"
+                                                        style={{
+                                                            borderBottom: idx < group.items.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+                                                        }}
+                                                    >
+                                                        {/* Número de unidad */}
+                                                        <span style={{
+                                                            fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)',
+                                                            width: 20, textAlign: 'right', flexShrink: 0
+                                                        }}>#{idx + 1}</span>
+
+                                                        <p className="flex-grow text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                                                            {item.estimatedPrice.toFixed(2)}€
+                                                        </p>
+
+                                                        {/* Asignación individual */}
+                                                        <div className="relative assignee-dropdown-container">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setOpenDropdownId(openDropdownId === item.id ? null : item.id)}
+                                                                className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium border bg-white border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+                                                            >
+                                                                <span>{getAssigneesLabel(item.assignedUserIds)}</span>
+                                                                <IconChevronDown />
+                                                            </button>
+                                                            {openDropdownId === item.id && (
+                                                                <>
+                                                                    <div
+                                                                        style={{ position: 'fixed', inset: 0, zIndex: 40 }}
+                                                                        onClick={() => setOpenDropdownId(null)}
+                                                                    />
+                                                                    <div className="absolute right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-2 min-w-[160px] z-50 flex flex-col gap-1">
+                                                                        <div className="px-2 py-1 text-[10px] uppercase tracking-wider font-semibold text-gray-400 border-b border-gray-100 mb-1">
+                                                                            Asignar a:
+                                                                        </div>
+                                                                        {houseMembers.map(member => {
+                                                                            const checked = !item.assignedUserIds || item.assignedUserIds.length === 0 || item.assignedUserIds.includes(member.userId);
+                                                                            return (
+                                                                                <label
+                                                                                    key={member.userId}
+                                                                                    className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer text-xs select-none"
+                                                                                >
+                                                                                    <input
+                                                                                        type="checkbox"
+                                                                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
+                                                                                        checked={checked}
+                                                                                        onChange={() => handleToggleMember(item, member.userId)}
+                                                                                    />
+                                                                                    <span className="text-gray-700 font-medium">{member.username}</span>
+                                                                                </label>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                </>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Eliminar unidad individual */}
+                                                        <button
+                                                            type="button"
+                                                            title="Eliminar esta unidad"
+                                                            onClick={() => handleDeleteItem(item.id, item.name, true)}
+                                                            disabled={loadingItemId === item.id}
+                                                            style={{
+                                                                background: 'none', border: 'none', cursor: 'pointer',
+                                                                color: 'var(--color-danger, #ef4444)', padding: '4px',
+                                                                borderRadius: 'var(--radius-sm)', display: 'flex',
+                                                                transition: 'opacity 0.15s',
+                                                            }}
+                                                        >
+                                                            <IconTrash />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
-                        <Button 
-                            variant="primary" 
-                            onClick={() => setShowCheckout(true)}
-                            className="w-full sm:w-auto px-6 py-2.5 text-sm font-semibold shadow-sm hover:shadow transition-all"
-                        >
-                            Pagar compra
-                        </Button>
-                    </div>
-                </Card>
-            ) : (
+                        {/* Footer con presupuesto y checkout */}
+                        <div className="p-5 bg-gray-50 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4">
+                            <div className="flex items-baseline gap-2">
+                                <span className="text-sm font-medium text-gray-500">Presupuesto Estimado:</span>
+                                <span className="text-2xl font-bold text-blue-600">
+                                    {shoppingList.estimatedBudget.toFixed(2)}€
+                                </span>
+                                <span className="text-xs text-gray-400">
+                                    ({shoppingList.pendingItems.length} {shoppingList.pendingItems.length === 1 ? 'producto' : 'productos'})
+                                </span>
+                            </div>
+                            <Button
+                                variant="primary"
+                                onClick={() => setShowCheckout(true)}
+                                className="w-full sm:w-auto px-6 py-2.5 text-sm font-semibold shadow-sm hover:shadow transition-all"
+                            >
+                                Pagar compra
+                            </Button>
+                        </div>
+                    </Card>
+                );
+            })() : (
                 <Card>
                     <div className="p-8 text-center">
                         <p className="text-gray-500">

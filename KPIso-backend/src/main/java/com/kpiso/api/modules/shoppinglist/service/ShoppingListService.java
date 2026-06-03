@@ -3,8 +3,6 @@ package com.kpiso.api.modules.shoppinglist.service;
 import com.kpiso.api.modules.shoppinglist.ShoppingItem;
 import com.kpiso.api.modules.shoppinglist.ShoppingItemRepository;
 import com.kpiso.api.modules.shoppinglist.ShoppingItemStatus;
-import com.kpiso.api.modules.shoppinglist.CachedProduct;
-import com.kpiso.api.modules.shoppinglist.CachedProductRepository;
 import com.kpiso.api.modules.shoppinglist.dto.AddShoppingItemRequest;
 import com.kpiso.api.modules.shoppinglist.dto.ProductSuggestionDto;
 import com.kpiso.api.modules.shoppinglist.dto.ShoppingItemResponse;
@@ -38,7 +36,6 @@ import java.util.stream.Collectors;
  * - Consultas al catálogo de productos (ProductCatalogClient)
  * - Estimación de precios (PriceEstimatorService)
  * - Persistencia de datos (ShoppingItemRepository)
- * - Caché local de productos (CachedProductRepository)
  * * Sigue el principio de Responsabilidad Única (SOLID).
  */
 @Slf4j
@@ -49,7 +46,6 @@ public class ShoppingListService {
     private final ProductCatalogClient productCatalogClient;
     private final PriceEstimatorService priceEstimatorService;
     private final ScraperServiceAdapter scraperServiceAdapter;
-    private final CachedProductRepository cachedProductRepository;
     private final ExpenseService expenseService;
     private final HouseMemberRepository houseMemberRepository;
 
@@ -57,14 +53,12 @@ public class ShoppingListService {
             ProductCatalogClient productCatalogClient,
             PriceEstimatorService priceEstimatorService,
             ScraperServiceAdapter scraperServiceAdapter,
-            CachedProductRepository cachedProductRepository,
             ExpenseService expenseService,
             HouseMemberRepository houseMemberRepository) {
         this.shoppingItemRepository = shoppingItemRepository;
         this.productCatalogClient = productCatalogClient;
         this.priceEstimatorService = priceEstimatorService;
         this.scraperServiceAdapter = scraperServiceAdapter;
-        this.cachedProductRepository = cachedProductRepository;
         this.expenseService = expenseService;
         this.houseMemberRepository = houseMemberRepository;
     }
@@ -76,58 +70,17 @@ public class ShoppingListService {
      */
     @Transactional
     public List<ProductSuggestionDto> searchProductSuggestions(String query) {
-        log.debug("Buscando sugerencias de productos para: {}", query);
+        return searchProductSuggestions(query, false);
+    }
 
-        // 1. Intentar buscar en la caché local de base de datos
-        List<CachedProduct> localProducts = cachedProductRepository.findTop8ByNameContainingIgnoreCase(query);
+    @Transactional
+    public List<ProductSuggestionDto> searchProductSuggestions(String query, boolean useFallback) {
+        log.debug("Buscando sugerencias de productos para: {}, useFallback: {}", query, useFallback);
 
-        // Si tenemos suficientes sugerencias locales (8), las devolvemos inmediatamente
-        // (Cache Hit)
-        if (localProducts.size() >= 8) {
-            log.debug("Cache Hit: Se encontraron sugerencias suficientes locales ({} productos)", localProducts.size());
-            return localProducts.stream()
-                    .map(product -> ProductSuggestionDto.builder()
-                            .name(product.getName())
-                            .imageUrl(product.getImageUrl())
-                            .categoryTags(product.getCategoryTags())
-                            .estimatedPrice(priceEstimatorService.estimatePrice(product.getCategoryTags()))
-                            .build())
-                    .collect(Collectors.toList());
-        }
+        // Consultar directamente al adaptador del scraper (archivo JSON local / fallback de OpenFoodFacts)
+        List<ProductDetails> apiSuggestions = scraperServiceAdapter.searchProductSuggestions(query, useFallback);
 
-        log.debug("Cache Miss parcial: Se encontraron {} productos locales, consultando Open Food Facts",
-                localProducts.size());
-
-        // 2. Si no hay suficientes locales, consultar a la API externa
-        List<ProductDetails> apiSuggestions = scraperServiceAdapter.searchProductSuggestions(query);
-
-        // 3. Persistir en caché los productos devueltos por la API que no existan
-        // localmente
-        for (ProductDetails apiProduct : apiSuggestions) {
-            if (apiProduct.isFound() && apiProduct.getName() != null && !apiProduct.getName().isBlank()) {
-                if (!cachedProductRepository.existsByNameIgnoreCase(apiProduct.getName().trim())) {
-                    CachedProduct newCache = CachedProduct.builder()
-                            .name(apiProduct.getName().trim())
-                            .imageUrl(apiProduct.getImageUrl())
-                            .mainCategory(apiProduct.getMainCategory())
-                            .categoryTags(apiProduct.getCategoryTags())
-                            .build();
-                    try {
-                        cachedProductRepository.save(newCache);
-                        log.debug("Producto guardado en caché de base de datos: {}", newCache.getName());
-                    } catch (Exception e) {
-                        log.warn("No se pudo cachear el producto '{}' debido a un error: {}", newCache.getName(),
-                                e.getMessage());
-                    }
-                }
-            }
-        }
-
-        // 4. Volver a consultar la base de datos para obtener el listado consolidado y
-        // actualizado (máximo 8)
-        List<CachedProduct> consolidatedProducts = cachedProductRepository.findTop8ByNameContainingIgnoreCase(query);
-
-        return consolidatedProducts.stream()
+        return apiSuggestions.stream()
                 .map(product -> ProductSuggestionDto.builder()
                         .name(product.getName())
                         .imageUrl(product.getImageUrl())
@@ -174,22 +127,6 @@ public class ShoppingListService {
             categoryTags = productDetails.getCategoryTags();
             log.debug("Producto encontrado en Open Food Facts: {}", productName);
 
-            // Auto-cachear el producto para búsquedas futuras si no existe
-            if (productName != null && !productName.isBlank()
-                    && !cachedProductRepository.existsByNameIgnoreCase(productName.trim())) {
-                try {
-                    CachedProduct newCache = CachedProduct.builder()
-                            .name(productName.trim())
-                            .imageUrl(imageUrl)
-                            .mainCategory(productDetails.getMainCategory())
-                            .categoryTags(categoryTags)
-                            .build();
-                    cachedProductRepository.save(newCache);
-                    log.debug("Auto-cacheado del producto añadido: {}", newCache.getName());
-                } catch (Exception e) {
-                    log.warn("No se pudo auto-cachear el producto '{}': {}", productName, e.getMessage());
-                }
-            }
         } else {
             log.debug("Producto no encontrado o fallo en el sistema externo, usando entrada manual");
         }

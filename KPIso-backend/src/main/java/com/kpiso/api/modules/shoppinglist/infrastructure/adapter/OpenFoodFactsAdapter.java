@@ -10,6 +10,13 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.client.RestClientException;
 
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -60,12 +67,34 @@ public class OpenFoodFactsAdapter implements ProductCatalogClient {
             );
 
             log.debug("Consultando Open Food Facts para sugerencias: {}", query);
-            String response = restTemplate.getForObject(url, String.class);
 
-            return parseOpenFoodFactsResponse(response);
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("User-Agent", "KPIso/1.0 - AcademicApp/JavaSpring - https://github.com/kpiso/KPIso");
+            HttpEntity<String> entity = new HttpEntity<>(headers);
 
+            ResponseEntity<String> responseEntity = restTemplate.exchange(
+                    url,
+                    HttpMethod.GET,
+                    entity,
+                    String.class
+            );
+
+            String body = responseEntity.getBody();
+            if (body != null && (body.contains("temporarily unavailable") || body.contains("experiencing unusually high demand") || body.contains("limit"))) {
+                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                        "La API externa de Open Food Facts está sobrecargada o bloqueando peticiones debido a alta demanda.");
+            }
+
+            return parseOpenFoodFactsResponse(body);
+
+        } catch (ResponseStatusException e) {
+            throw e;
         } catch (RestClientException e) {
             log.warn("Error al conectar con Open Food Facts para la búsqueda: {}", query, e);
+            if (e.getMessage() != null && (e.getMessage().contains("429") || e.getMessage().contains("503") || e.getMessage().contains("Limit"))) {
+                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                        "La API externa de Open Food Facts está sobrecargada o limitando las peticiones.");
+            }
             return new ArrayList<>();
         } catch (Exception e) {
             log.error("Error inesperado al procesar búsqueda en Open Food Facts: {}", query, e);
