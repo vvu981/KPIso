@@ -33,6 +33,23 @@ services:
       retries: 3
       start_period: 60s
 
+  mcp:
+    build:
+      context: ./kpiso-mcp
+      dockerfile: Dockerfile
+    container_name: kpiso-mcp
+    ports:
+      - "3000:3000"
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - SCRAPER_URL=http://kpiso-scraper:8081
+      - PORT=3000
+    depends_on:
+      - scraper
+    networks:
+      - kpiso-network
+    restart: always
+
   backend:
     build:
       context: ./KPIso-backend

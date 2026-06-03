@@ -6,6 +6,7 @@ import { Card } from '../ui/Card.jsx';
 import { Badge } from '../ui/Badge.jsx';
 import { Alert } from '../ui/Alert.jsx';
 import { Input } from '../ui/Input.jsx';
+import AIChatbox from './AIChatbox.jsx';
 
 const IconPlus = () => (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -1528,6 +1529,13 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                     </Card>
                 </div>
             )}
+
+            {/* Chatbox Asistente IA */}
+            <AIChatbox 
+                houseId={houseId} 
+                currentUserId={currentUserId} 
+                loadShoppingList={loadShoppingList} 
+            />
         </div>
     );
 }

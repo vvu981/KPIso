@@ -58,7 +58,7 @@ SEED_TERMS: list[str] = [
   "lomo de salmón", "lomo de bacalao", "filete de lenguado", 
   "merluza", "lubina", "dorada", "gambas", "langostinos", 
   "mejillones", "almejas", "calamares", "pulpo", "sepia",
-  "pavo", "cordero", "cerdo", "ternera", "pollo", "pescado",
+  "pavo", "cordero", "cerdo", "ternera", "pollo", "pescado", "macarrones", "espaguetis", "nuez", "nueces"
   
 ]
 
