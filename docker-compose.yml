@@ -14,6 +14,25 @@ services:
       - kpiso-network
     restart: always
 
+  scraper:
+    build:
+      context: ./kpiso-scraper
+      dockerfile: Dockerfile
+    container_name: kpiso-scraper
+    volumes:
+      - kpiso-scraper-data:/app/data
+    environment:
+      - DATA_DIR=/app/data
+    networks:
+      - kpiso-network
+    restart: always
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
   backend:
     build:
       context: ./KPIso-backend
@@ -27,8 +46,10 @@ services:
       - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
       - APP_FRONTEND_URL=${FRONTEND_URL}
       - JWT_SECRET=${JWT_SECRET}
+      - SCRAPER_URL=http://kpiso-scraper:8081
     depends_on:
       - db
+      - scraper
     networks:
       - kpiso-network
     restart: always
@@ -50,6 +71,8 @@ services:
 
 volumes:
   kpiso-db-data:
+    driver: local
+  kpiso-scraper-data:
     driver: local
 
 networks:

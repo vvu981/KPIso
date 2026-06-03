@@ -82,6 +82,12 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
     const [manualName, setManualName] = useState('');
     const [manualPrice, setManualPrice] = useState('');
 
+    // Estado para el flujo de añadir sugerencia: comprobación de duplicado + cantidad
+    const [pendingSuggestion, setPendingSuggestion] = useState(null); // sugerencia seleccionada
+    const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+    const [showQuantityModal, setShowQuantityModal] = useState(false);
+    const [selectedQuantity, setSelectedQuantity] = useState(1);
+
     const getAssigneesLabel = (assignedUserIds) => {
         if (!assignedUserIds || assignedUserIds.length === 0 || assignedUserIds.length === houseMembers.length) {
             return 'Todos';
@@ -200,11 +206,88 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
     };
 
     /**
-     * Añade un nuevo producto a la lista (ya sea desde input directo o desde sugerencia)
+     * Intercepta el click en una sugerencia del dropdown.
+     * Comprueba si el producto ya existe en la lista (pendiente);
+     * si es así muestra el aviso de duplicado, si no va directo al selector de cantidad.
+     */
+    const handleSuggestionClick = (suggestion) => {
+        setShowSuggestions(false);
+        setPendingSuggestion(suggestion);
+        setSelectedQuantity(1);
+
+        const nameNorm = suggestion.name.trim().toLowerCase();
+        const isDuplicate = shoppingList.pendingItems.some(
+            item => item.name.trim().toLowerCase() === nameNorm
+        );
+
+        if (isDuplicate) {
+            setShowDuplicateModal(true);
+        } else {
+            setShowQuantityModal(true);
+        }
+    };
+
+    /**
+     * Llamado cuando el usuario acepta el aviso de duplicado.
+     * Cierra el aviso y abre el selector de cantidad.
+     */
+    const handleDuplicateAccepted = () => {
+        setShowDuplicateModal(false);
+        setShowQuantityModal(true);
+    };
+
+    /**
+     * Confirma la cantidad y añade el producto (una vez por unidad solicitada).
+     */
+    const handleConfirmQuantity = async () => {
+        if (!pendingSuggestion) return;
+        setShowQuantityModal(false);
+        setLoading(true);
+        setError(null);
+        setSuccess(null);
+
+        try {
+            const addedItems = [];
+            for (let i = 0; i < selectedQuantity; i++) {
+                const response = await api.post('/shopping-list/add', {
+                    productName: pendingSuggestion.name,
+                    houseId: houseId,
+                    addedById: currentUserId,
+                    assignedUserIds: []
+                }, {
+                    headers: token ? { Authorization: `Bearer ${token}` } : {}
+                });
+                addedItems.push(response.data);
+            }
+            setShoppingList(prev => ({
+                ...prev,
+                pendingItems: [...addedItems.reverse(), ...prev.pendingItems],
+                estimatedBudget: prev.estimatedBudget + addedItems.reduce((sum, item) => sum + (item.estimatedPrice || 0), 0)
+            }));
+            setProductInput('');
+            setPendingSuggestion(null);
+            const label = selectedQuantity > 1 ? `${selectedQuantity}× ${pendingSuggestion.name}` : pendingSuggestion.name;
+            setSuccess(`"${label}" añadido a la lista`);
+            setTimeout(() => setSuccess(null), 3000);
+        } catch (err) {
+            console.error('Error al añadir producto:', err);
+            setError(err.response?.data || 'Error al añadir el producto. Intenta de nuevo.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    /**
+     * Añade un nuevo producto a la lista desde el formulario directo (input o manual).
      */
     const handleAddProduct = async (e, suggestion = null) => {
         e?.preventDefault();
-        const productName = suggestion ? suggestion.name : (manualMode ? manualName.trim() : productInput.trim());
+        // Si viene de una sugerencia, usar el flujo de duplicado + cantidad
+        if (suggestion) {
+            handleSuggestionClick(suggestion);
+            return;
+        }
+        const productName = manualMode ? manualName.trim() : productInput.trim();
         if (!productName) {
             setError('Por favor escribe un nombre de producto');
             return;
@@ -490,7 +573,7 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                                                 type="button"
                                                 onClick={(e) => {
                                                     e.preventDefault();
-                                                    handleAddProduct(e, suggestion);
+                                                    handleSuggestionClick(suggestion);
                                                 }}
                                                 style={{
                                                     width: '100%',
@@ -870,6 +953,166 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                     </Card>
                 );
             })()}
+
+            {/* Modal: Aviso de Producto Duplicado */}
+            {showDuplicateModal && pendingSuggestion && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+                    backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 10001,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px'
+                }}>
+                    <Card style={{ width: '100%', maxWidth: '380px', backgroundColor: 'var(--bg-surface)' }}>
+                        <div className="p-5 border-b border-gray-200 flex items-center gap-3">
+                            {/* Icono de aviso */}
+                            <div style={{
+                                width: 36, height: 36, borderRadius: '50%',
+                                backgroundColor: '#FEF3C7', display: 'flex',
+                                alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                            }}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                                    <line x1="12" y1="9" x2="12" y2="13"/>
+                                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                                </svg>
+                            </div>
+                            <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Producto ya en la lista</h3>
+                        </div>
+                        <div className="p-5">
+                            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginBottom: '20px', lineHeight: 1.5 }}>
+                                <strong style={{ color: 'var(--text-primary)' }}>«{pendingSuggestion.name}»</strong> ya está en tu lista de la compra.
+                                ¿Quieres añadirlo igualmente?
+                            </p>
+                            <div className="flex gap-2">
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    className="flex-1"
+                                    onClick={() => { setShowDuplicateModal(false); setPendingSuggestion(null); }}
+                                >
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="primary"
+                                    className="flex-1"
+                                    onClick={handleDuplicateAccepted}
+                                >
+                                    Añadir de todas formas
+                                </Button>
+                            </div>
+                        </div>
+                    </Card>
+                </div>
+            )}
+
+            {/* Modal: Selector de Cantidad */}
+            {showQuantityModal && pendingSuggestion && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+                    backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 10001,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px'
+                }}>
+                    <Card style={{ width: '100%', maxWidth: '380px', backgroundColor: 'var(--bg-surface)' }}>
+                        <div className="p-5 border-b border-gray-200 flex items-center gap-3">
+                            {pendingSuggestion.imageUrl && (
+                                <img
+                                    src={pendingSuggestion.imageUrl}
+                                    alt={pendingSuggestion.name}
+                                    style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 'var(--radius-md)', flexShrink: 0 }}
+                                    onError={(e) => { e.target.style.display = 'none'; }}
+                                />
+                            )}
+                            <div style={{ minWidth: 0 }}>
+                                <h3 className="text-base font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                                    {pendingSuggestion.name}
+                                </h3>
+                                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', margin: 0 }}>
+                                    Est. {pendingSuggestion.estimatedPrice?.toFixed(2)}€ / ud.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="p-5">
+                            <p style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '12px' }}>
+                                ¿Cuántas unidades?
+                            </p>
+                            {/* Control de cantidad con botones +/- */}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px', marginBottom: '24px' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedQuantity(q => Math.max(1, q - 1))}
+                                    style={{
+                                        width: 40, height: 40, borderRadius: '50%',
+                                        border: '2px solid var(--border-default)',
+                                        background: 'var(--bg-elevated)',
+                                        color: 'var(--text-primary)',
+                                        fontSize: '20px', fontWeight: 700,
+                                        cursor: 'pointer', display: 'flex',
+                                        alignItems: 'center', justifyContent: 'center',
+                                        transition: 'background 0.15s, border-color 0.15s',
+                                    }}
+                                    onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'}
+                                    onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-default)'}
+                                    disabled={selectedQuantity <= 1}
+                                >
+                                    −
+                                </button>
+                                <span style={{
+                                    fontSize: '2rem', fontWeight: 700,
+                                    color: 'var(--text-primary)', minWidth: '3rem',
+                                    textAlign: 'center', lineHeight: 1
+                                }}>
+                                    {selectedQuantity}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedQuantity(q => Math.min(20, q + 1))}
+                                    style={{
+                                        width: 40, height: 40, borderRadius: '50%',
+                                        border: '2px solid var(--border-default)',
+                                        background: 'var(--bg-elevated)',
+                                        color: 'var(--text-primary)',
+                                        fontSize: '20px', fontWeight: 700,
+                                        cursor: 'pointer', display: 'flex',
+                                        alignItems: 'center', justifyContent: 'center',
+                                        transition: 'background 0.15s, border-color 0.15s',
+                                    }}
+                                    onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'}
+                                    onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-default)'}
+                                    disabled={selectedQuantity >= 20}
+                                >
+                                    +
+                                </button>
+                            </div>
+                            {selectedQuantity > 1 && (
+                                <p style={{ textAlign: 'center', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                                    Total est.: <strong style={{ color: 'var(--accent)' }}>
+                                        {(pendingSuggestion.estimatedPrice * selectedQuantity).toFixed(2)}€
+                                    </strong>
+                                </p>
+                            )}
+                            <div className="flex gap-2">
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    className="flex-1"
+                                    onClick={() => { setShowQuantityModal(false); setPendingSuggestion(null); }}
+                                >
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="primary"
+                                    className="flex-1"
+                                    disabled={loading}
+                                    onClick={handleConfirmQuantity}
+                                >
+                                    {loading ? 'Añadiendo...' : `Añadir ${selectedQuantity > 1 ? `(${selectedQuantity})` : ''}`}
+                                </Button>
+                            </div>
+                        </div>
+                    </Card>
+                </div>
+            )}
 
             {/* Modal de Checkout */}
             {showCheckout && (

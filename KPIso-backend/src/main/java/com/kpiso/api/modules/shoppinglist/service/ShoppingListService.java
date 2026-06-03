@@ -9,7 +9,7 @@ import com.kpiso.api.modules.shoppinglist.dto.AddShoppingItemRequest;
 import com.kpiso.api.modules.shoppinglist.dto.ProductSuggestionDto;
 import com.kpiso.api.modules.shoppinglist.dto.ShoppingItemResponse;
 import com.kpiso.api.modules.shoppinglist.dto.ShoppingListResponse;
-import com.kpiso.api.modules.shoppinglist.infrastructure.adapter.OpenFoodFactsAdapter;
+import com.kpiso.api.modules.shoppinglist.infrastructure.adapter.ScraperServiceAdapter;
 import com.kpiso.api.modules.shoppinglist.infrastructure.client.ProductCatalogClient;
 import com.kpiso.api.modules.shoppinglist.infrastructure.client.ProductDetails;
 import com.kpiso.api.modules.expense.ExpenseService;
@@ -48,7 +48,7 @@ public class ShoppingListService {
     private final ShoppingItemRepository shoppingItemRepository;
     private final ProductCatalogClient productCatalogClient;
     private final PriceEstimatorService priceEstimatorService;
-    private final OpenFoodFactsAdapter openFoodFactsAdapter;
+    private final ScraperServiceAdapter scraperServiceAdapter;
     private final CachedProductRepository cachedProductRepository;
     private final ExpenseService expenseService;
     private final HouseMemberRepository houseMemberRepository;
@@ -56,14 +56,14 @@ public class ShoppingListService {
     public ShoppingListService(ShoppingItemRepository shoppingItemRepository,
             ProductCatalogClient productCatalogClient,
             PriceEstimatorService priceEstimatorService,
-            OpenFoodFactsAdapter openFoodFactsAdapter,
+            ScraperServiceAdapter scraperServiceAdapter,
             CachedProductRepository cachedProductRepository,
             ExpenseService expenseService,
             HouseMemberRepository houseMemberRepository) {
         this.shoppingItemRepository = shoppingItemRepository;
         this.productCatalogClient = productCatalogClient;
         this.priceEstimatorService = priceEstimatorService;
-        this.openFoodFactsAdapter = openFoodFactsAdapter;
+        this.scraperServiceAdapter = scraperServiceAdapter;
         this.cachedProductRepository = cachedProductRepository;
         this.expenseService = expenseService;
         this.houseMemberRepository = houseMemberRepository;
@@ -99,7 +99,7 @@ public class ShoppingListService {
                 localProducts.size());
 
         // 2. Si no hay suficientes locales, consultar a la API externa
-        List<ProductDetails> apiSuggestions = openFoodFactsAdapter.searchProductSuggestions(query);
+        List<ProductDetails> apiSuggestions = scraperServiceAdapter.searchProductSuggestions(query);
 
         // 3. Persistir en caché los productos devueltos por la API que no existan
         // localmente
