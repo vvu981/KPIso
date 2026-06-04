@@ -341,7 +341,10 @@ public class ShoppingListService {
         }
 
         List<HouseMember> allMembers = houseMemberRepository.findByHouseId(request.getHouseId());
-        List<UUID> allMemberIds = allMembers.stream().map(m -> m.getUser().getId()).collect(Collectors.toList());
+        List<UUID> activeMemberIds = allMembers.stream()
+                .filter(HouseMember::isActive)
+                .map(m -> m.getUser().getId())
+                .collect(Collectors.toList());
 
         Map<UUID, BigDecimal> exactSplits = new HashMap<>();
         UUID checkoutId = UUID.randomUUID();
@@ -353,7 +356,7 @@ public class ShoppingListService {
             BigDecimal itemRealPrice = request.getTotalRealAmount().multiply(proportion);
 
             List<UUID> usersForItem = (item.getAssignedUsers() == null || item.getAssignedUsers().isEmpty())
-                    ? allMemberIds
+                    ? activeMemberIds
                     : item.getAssignedUsers();
 
             BigDecimal pricePerUser = itemRealPrice.divide(BigDecimal.valueOf(usersForItem.size()), 2,

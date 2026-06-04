@@ -46,9 +46,12 @@ class ExpenseServiceTest {
     @Mock
     private TaskRepository taskRepository;
 
-        private ActivityLogService activityLogService;
+    @Mock
+    private DirectPaymentRepository directPaymentRepository;
 
-        private ExpenseService expenseService;
+    private ActivityLogService activityLogService;
+
+    private ExpenseService expenseService;
 
     private House house;
     private User payer;
@@ -66,7 +69,7 @@ class ExpenseServiceTest {
             public void log(String description, String actionType, House house, User user) {
             }
         };
-        expenseService = new ExpenseService(expenseRepository, houseRepository, userRepository, houseMemberRepository, activityLogService, taskRepository);
+        expenseService = new ExpenseService(expenseRepository, houseRepository, userRepository, houseMemberRepository, activityLogService, taskRepository, directPaymentRepository);
     }
 
     @Test
@@ -507,11 +510,14 @@ class ExpenseServiceTest {
     void settleAllHouseExpensesShouldMarkExpensesAsSettled() {
         Expense expenseA = Expense.builder().id(UUID.randomUUID()).title("Compra A").amount(new BigDecimal("10.00")).house(house).paidBy(payer).participants(List.of(participantA)).settled(false).build();
         Expense expenseB = Expense.builder().id(UUID.randomUUID()).title("Compra B").amount(new BigDecimal("5.00")).house(house).paidBy(payer).participants(List.of(participantA)).settled(false).build();
+        HouseMember adminMember = HouseMember.builder().user(payer).role(HouseRole.ADMIN).active(true).settleApproved(true).build();
 
+        when(houseMemberRepository.findByHouseIdAndUserId(house.getId(), payer.getId())).thenReturn(Optional.of(adminMember));
+        when(houseMemberRepository.findByHouseId(house.getId())).thenReturn(List.of(adminMember));
         when(expenseRepository.findByHouseIdAndSettledFalse(house.getId())).thenReturn(List.of(expenseA, expenseB));
         when(expenseRepository.save(any(Expense.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        expenseService.settleAllHouseExpenses(house.getId());
+        expenseService.settleAllHouseExpenses(house.getId(), payer.getId());
 
         assertTrue(expenseA.isSettled());
         assertTrue(expenseB.isSettled());

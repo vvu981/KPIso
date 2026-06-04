@@ -38,4 +38,8 @@ public class HouseMember {
     @Column(nullable = false)
     @Builder.Default
     private boolean active = true;
+
+    @Column(name = "settle_approved", nullable = false, columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean settleApproved = false;
 }

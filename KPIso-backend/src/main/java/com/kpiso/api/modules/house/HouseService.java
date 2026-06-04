@@ -121,6 +121,7 @@ public class HouseService {
                                                 .userId(m.getUser().getId())
                                                 .username(m.getUser().getUsername())
                                                 .role(m.getRole().name())
+                                                .settleApproved(m.isSettleApproved())
                                                 .build())
                                 .collect(Collectors.toList());
 
@@ -150,6 +151,7 @@ public class HouseService {
                                                 .userId(m.getUser().getId())
                                                 .username(m.getUser().getUsername())
                                                 .role(m.getRole().name())
+                                                .settleApproved(m.isSettleApproved())
                                                 .build())
                                 .collect(Collectors.toList());
 

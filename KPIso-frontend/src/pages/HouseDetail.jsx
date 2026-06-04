@@ -9,6 +9,7 @@ import { Alert } from '../components/ui/Alert.jsx';
 import { Input } from '../components/ui/Input.jsx';
 import { PageLoader } from '../components/layout/PageLoader.jsx';
 import ShoppingListSection from '../components/shopping/ShoppingListSection.jsx';
+import DirectPaymentForm from '../components/DirectPaymentForm.jsx';
 import {
     IconClipboardDocumentList, IconBanknotes, IconMagnifyingGlass,
     IconCalendar, IconListBullet, IconCheck, IconXMark,
@@ -124,6 +125,7 @@ export default function HouseDetail() {
 
     const [showEditHouseModal, setShowEditHouseModal] = useState(false);
     const [editHouseForm, setEditHouseForm] = useState({ name: '', profilePictureUrl: '' });
+    const [showDirectPaymentModal, setShowDirectPaymentModal] = useState(false);
 
     // Modales de Perfil de Usuario
     const [showEditProfileModal, setShowEditProfileModal] = useState(false);
@@ -395,6 +397,30 @@ export default function HouseDetail() {
         );
     };
 
+    const handleToggleSettleApproval = async (currentApprovedStatus) => {
+        try {
+            await api.patch(`/houses/${houseId}/members/settle-approval?userId=${currentUserId}&approved=${!currentApprovedStatus}`);
+            fetchData();
+        } catch (err) {
+            showAlert('No se pudo actualizar tu estado de conformidad.');
+        }
+    };
+
+    const handleSettleAll = async () => {
+        showConfirm(
+            '¿Estás seguro de que deseas liquidar todas las cuentas de la casa? Esto archivará todos los gastos y pagos registrados y reiniciará los balances y conformidades a cero.',
+            async () => {
+                try {
+                    await api.post(`/expenses/house/${houseId}/settle-all?userId=${currentUserId}`);
+                    fetchData();
+                } catch (err) {
+                    showAlert(err.response?.data || 'Error al liquidar las cuentas.');
+                }
+            },
+            'Liquidar Cuentas'
+        );
+    };
+
     // Handlers para vivienda
     const handleUpdateHouse = async (e) => {
         e.preventDefault();
@@ -520,6 +546,8 @@ export default function HouseDetail() {
                             setShowEditProfileModal(true);
                         }}
                         isReadOnly={house.isReadOnly}
+                        onRegisterDirectPayment={() => setShowDirectPaymentModal(true)}
+                        onToggleSettleApproval={handleToggleSettleApproval}
                     />
                 </aside>
 
@@ -578,6 +606,9 @@ export default function HouseDetail() {
                             onSettlePayment={handleRegisterIndividualPayment}
                             setExpenseForm={setExpenseForm}
                             currentUserId={currentUserId}
+                            isAdmin={selfIsAdmin}
+                            allApproved={house.members.every(m => m.settleApproved)}
+                            onSettleAll={handleSettleAll}
                         />
                     )}
 
@@ -614,6 +645,15 @@ export default function HouseDetail() {
                     onFormChange={setProfileFormData}
                     onSubmit={handleUpdateProfile}
                     onClose={() => setShowEditProfileModal(false)}
+                />
+            )}
+
+            {showDirectPaymentModal && (
+                <DirectPaymentForm
+                    house={house}
+                    currentUserId={currentUserId}
+                    onClose={() => setShowDirectPaymentModal(false)}
+                    onSuccess={fetchData}
                 />
             )}
 
@@ -799,6 +839,8 @@ function HouseSidebar({
                           onColorChange,
                           onEditProfile,
                           isReadOnly,
+                          onRegisterDirectPayment,
+                          onToggleSettleApproval,
                       }) {
     return (
         <Card padding="lg" glass>
@@ -832,6 +874,21 @@ function HouseSidebar({
                 ))}
             </div>
 
+            {sidebarView === 'money' && (
+                <div style={{ 
+                    marginBottom: 'var(--space-4)', 
+                    padding: 'var(--space-3)', 
+                    borderRadius: 'var(--radius-lg)', 
+                    backgroundColor: 'rgba(16, 185, 129, 0.08)', 
+                    border: '1px solid rgba(16, 185, 129, 0.2)', 
+                    fontSize: '11px', 
+                    color: 'var(--text-secondary)',
+                    lineHeight: '1.4'
+                }}>
+                    <strong>Checklist de Consenso:</strong> Confirma con tu check si estás conforme con los saldos. La liquidación general se habilitará al completarse.
+                </div>
+            )}
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                 {members.map((member) => {
                     const status = memberStatuses[member.userId] || { balance: 0, color: '#6366f1', points: 0 };
@@ -851,6 +908,32 @@ function HouseSidebar({
                             }}
                         >
                             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                                <div
+                                    onClick={() => {
+                                        if (member.userId === currentUserId && !isReadOnly) {
+                                            onToggleSettleApproval(member.settleApproved);
+                                        }
+                                    }}
+                                    title={member.userId === currentUserId ? "Tu conformidad para liquidar cuentas" : `${member.username} ${member.settleApproved ? 'ha dado conformidad' : 'aún no ha dado conformidad'}`}
+                                    style={{
+                                        cursor: member.userId === currentUserId && !isReadOnly ? 'pointer' : 'not-allowed',
+                                        width: '18px',
+                                        height: '18px',
+                                        borderRadius: 'var(--radius-sm)',
+                                        border: `2px solid ${member.settleApproved ? 'var(--success)' : 'var(--border-default)'}`,
+                                        backgroundColor: member.settleApproved ? 'var(--success)' : 'transparent',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        transition: 'all 200ms ease',
+                                    }}
+                                >
+                                    {member.settleApproved && (
+                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                                            <polyline points="20 6 9 17 4 12" />
+                                        </svg>
+                                    )}
+                                </div>
                                 <div
                                     style={{
                                         width: 12,
@@ -900,6 +983,28 @@ function HouseSidebar({
                     );
                 })}
             </div>
+
+            {!isReadOnly && (
+                <div style={{ marginTop: 'var(--space-4)' }}>
+                    <Button
+                        variant="secondary"
+                        full
+                        onClick={onRegisterDirectPayment}
+                        style={{
+                            borderColor: 'var(--success)',
+                            color: 'var(--success)',
+                            backgroundColor: 'transparent',
+                            fontWeight: 'bold',
+                            borderWidth: '2px',
+                            transition: 'all 0.2s ease-in-out'
+                        }}
+                    >
+                        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                            <IconBanknotes /> Registrar Bizum / Pago
+                        </span>
+                    </Button>
+                </div>
+            )}
         </Card>
     );
 }
@@ -1382,6 +1487,9 @@ function ExpensesSection({
                              onSettlePayment,
                              setExpenseForm,
                              currentUserId,
+                             isAdmin,
+                             allApproved,
+                             onSettleAll,
                          }) {
     const toggleBeneficiary = (id) => {
         const updated = expenseForm.participantIds.includes(id)
@@ -1404,6 +1512,33 @@ function ExpensesSection({
                     </Button>
                 )}
             </div>
+
+            {isAdmin && !house.isReadOnly && (
+                <div style={{ marginBottom: 'var(--space-4)' }}>
+                    <Button
+                        variant={allApproved ? 'primary' : 'secondary'}
+                        full
+                        disabled={!allApproved}
+                        onClick={onSettleAll}
+                        style={{
+                            borderColor: allApproved ? 'var(--success)' : 'var(--border-default)',
+                            color: allApproved ? '#fff' : 'var(--text-tertiary)',
+                            fontWeight: 'bold',
+                            backgroundColor: allApproved ? 'var(--success)' : 'transparent',
+                            borderWidth: '2px',
+                        }}
+                    >
+                        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M18 3L6 15"/>
+                                <path d="M9 18l3 3 6-6-3-3-6 6z"/>
+                                <path d="M3 21h3"/>
+                            </svg>
+                            {allApproved ? 'Liquidar Cuentas del Piso (Consenso Listo)' : 'Liquidar Cuentas del Piso (Falta Consenso)'}
+                        </span>
+                    </Button>
+                </div>
+            )}
 
             {/* Capa Activa de Liquidaciones cruzadas recomendadas */}
             {settlements.length > 0 && (

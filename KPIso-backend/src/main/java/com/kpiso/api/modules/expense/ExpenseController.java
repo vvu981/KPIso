@@ -46,9 +46,13 @@ public class ExpenseController {
     }
 
     @PostMapping("/house/{houseId}/settle-all")
-    public ResponseEntity<String> settleAll(@PathVariable UUID houseId) {
-        expenseService.settleAllHouseExpenses(houseId);
-        return ResponseEntity.ok("Cuentas del piso liquidadas.");
+    public ResponseEntity<?> settleAll(@PathVariable UUID houseId, @RequestParam UUID userId) {
+        try {
+            expenseService.settleAllHouseExpenses(houseId, userId);
+            return ResponseEntity.ok("Cuentas del piso liquidadas.");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
     }
 
     @DeleteMapping("/{expenseId}")

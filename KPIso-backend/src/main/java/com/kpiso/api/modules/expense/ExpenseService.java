@@ -24,16 +24,19 @@ public class ExpenseService {
     private final HouseMemberRepository houseMemberRepository;
     private final ActivityLogService activityLogService;
     private final TaskRepository taskRepository;
+    private final DirectPaymentRepository directPaymentRepository;
 
     public ExpenseService(ExpenseRepository expenseRepository, HouseRepository houseRepository,
                           UserRepository userRepository, HouseMemberRepository houseMemberRepository,
-                          ActivityLogService activityLogService, TaskRepository taskRepository) {
+                          ActivityLogService activityLogService, TaskRepository taskRepository,
+                          DirectPaymentRepository directPaymentRepository) {
         this.expenseRepository = expenseRepository;
         this.houseRepository = houseRepository;
         this.userRepository = userRepository;
         this.houseMemberRepository = houseMemberRepository;
         this.activityLogService = activityLogService;
         this.taskRepository = taskRepository;
+        this.directPaymentRepository = directPaymentRepository;
     }
 
     @Transactional
@@ -137,6 +140,14 @@ public class ExpenseService {
             }
         }
 
+        List<DirectPayment> directPayments = directPaymentRepository.findByHouseIdAndSettledFalse(houseId);
+        for (DirectPayment dp : directPayments) {
+            UUID senderId = dp.getSender().getId();
+            UUID recipientId = dp.getRecipient().getId();
+            rawBalances.put(senderId, rawBalances.getOrDefault(senderId, BigDecimal.ZERO).add(dp.getAmount()));
+            rawBalances.put(recipientId, rawBalances.getOrDefault(recipientId, BigDecimal.ZERO).subtract(dp.getAmount()));
+        }
+
         LocalDateTime now = LocalDateTime.now();
         int currentMonthValue = now.getMonthValue();
         int currentYearValue = now.getYear();
@@ -219,6 +230,14 @@ public class ExpenseService {
             }
         }
 
+        List<DirectPayment> directPayments = directPaymentRepository.findByHouseIdAndSettledFalse(houseId);
+        for (DirectPayment dp : directPayments) {
+            UUID senderId = dp.getSender().getId();
+            UUID recipientId = dp.getRecipient().getId();
+            balances.put(senderId, balances.getOrDefault(senderId, BigDecimal.ZERO).add(dp.getAmount()));
+            balances.put(recipientId, balances.getOrDefault(recipientId, BigDecimal.ZERO).subtract(dp.getAmount()));
+        }
+
         List<Map.Entry<UUID, BigDecimal>> debtors = new ArrayList<>();
         List<Map.Entry<UUID, BigDecimal>> creditors = new ArrayList<>();
 
@@ -273,11 +292,35 @@ public class ExpenseService {
     }
 
     @Transactional
-    public void settleAllHouseExpenses(UUID houseId) {
+    public void settleAllHouseExpenses(UUID houseId, UUID userId) {
+        HouseMember requester = houseMemberRepository.findByHouseIdAndUserId(houseId, userId)
+                .orElseThrow(() -> new IllegalArgumentException("No perteneces a esta vivienda"));
+        if (requester.getRole() != HouseRole.ADMIN) {
+            throw new IllegalStateException("Solo el administrador puede liquidar las cuentas.");
+        }
+
+        List<HouseMember> members = houseMemberRepository.findByHouseId(houseId);
+        List<HouseMember> activeMembers = members.stream().filter(HouseMember::isActive).collect(Collectors.toList());
+        
+        boolean allApproved = activeMembers.stream().allMatch(HouseMember::isSettleApproved);
+        if (!allApproved) {
+            throw new IllegalStateException("No todos los convivientes han aprobado la liquidación.");
+        }
+
         List<Expense> expenses = expenseRepository.findByHouseIdAndSettledFalse(houseId);
         for (Expense e : expenses) {
             e.setSettled(true);
             expenseRepository.save(e);
+        }
+        List<DirectPayment> directPayments = directPaymentRepository.findByHouseIdAndSettledFalse(houseId);
+        for (DirectPayment dp : directPayments) {
+            dp.setSettled(true);
+            directPaymentRepository.save(dp);
+        }
+
+        for (HouseMember m : activeMembers) {
+            m.setSettleApproved(false);
+            houseMemberRepository.save(m);
         }
     }
 
