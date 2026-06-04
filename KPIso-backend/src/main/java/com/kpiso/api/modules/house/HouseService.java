@@ -14,6 +14,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.Random;
@@ -215,16 +217,34 @@ public class HouseService {
                         if (e.getPaidBy().getId().equals(targetUserId)) {
                                 targetBalance = targetBalance.add(e.getAmount());
                         }
-                        if (e.getParticipants().stream().anyMatch(p -> p.getId().equals(targetUserId))) {
-                                BigDecimal share = e.getAmount().divide(BigDecimal.valueOf(e.getParticipants().size()),
-                                                2, RoundingMode.HALF_UP);
-                                targetBalance = targetBalance.subtract(share);
+                        
+                        Map<UUID, BigDecimal> splits = new HashMap<>();
+                        if (e.getExactSplits() != null && !e.getExactSplits().isEmpty()) {
+                                splits = e.getExactSplits();
+                        } else {
+                                List<User> participants = e.getParticipants();
+                                int numParticipants = participants.size();
+                                if (numParticipants > 0) {
+                                        long totalCents = e.getAmount().movePointRight(2).setScale(0, RoundingMode.HALF_UP).longValue();
+                                        long baseShareCents = totalCents / numParticipants;
+                                        long remainderCents = totalCents % numParticipants;
+
+                                        for (int i = 0; i < numParticipants; i++) {
+                                                long cents = baseShareCents + (i < remainderCents ? 1 : 0);
+                                                BigDecimal share = BigDecimal.valueOf(cents).movePointLeft(2);
+                                                splits.put(participants.get(i).getId(), share);
+                                        }
+                                }
+                        }
+
+                        if (splits.containsKey(targetUserId)) {
+                                targetBalance = targetBalance.subtract(splits.get(targetUserId));
                         }
                 }
 
                 // Validación de balance financiero: si tiene deudas o saldos a favor
-                // (tolerancia de 1 céntimo)
-                if (targetBalance.abs().compareTo(new BigDecimal("0.01")) >= 0) {
+                // (tolerancia de 5 céntimos, para coincidir con ExpenseService.getHouseMemberStatuses)
+                if (targetBalance.abs().compareTo(new BigDecimal("0.05")) > 0) {
                         throw new IllegalStateException(String.format(
                                         "No se puede expulsar a %s porque su cuenta no está liquidada. Debe dejar su saldo en 0.00€ (Saldo actual: %s€)",
                                         targetUser.getUsername(), targetBalance.setScale(2, RoundingMode.HALF_UP)));

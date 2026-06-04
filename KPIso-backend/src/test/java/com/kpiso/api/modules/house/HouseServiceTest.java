@@ -351,6 +351,34 @@ class HouseServiceTest {
     }
 
     @Test
+    void removeMemberShouldSucceedWhenBalanceIsWithinTolerance() {
+        HouseMember requester = TestFixtures.houseMember(house, creator, HouseRole.ADMIN, "#6366f1");
+        HouseMember targetMember = TestFixtures.houseMember(house, guest, HouseRole.MEMBER, "#10b981");
+        // 0.04€ de deuda (por debajo del límite de 0.05€)
+        Expense expense = Expense.builder()
+                .id(UUID.randomUUID())
+                .title("Gasto")
+                .amount(new BigDecimal("0.04"))
+                .house(house)
+                .paidBy(creator)
+                .participants(List.of(guest))
+                .settled(false)
+                .build();
+
+        when(houseRepository.findById(house.getId())).thenReturn(Optional.of(house));
+        when(userRepository.findById(creator.getId())).thenReturn(Optional.of(creator));
+        when(userRepository.findById(guest.getId())).thenReturn(Optional.of(guest));
+        when(houseMemberRepository.findByHouseIdAndUserId(house.getId(), creator.getId())).thenReturn(Optional.of(requester));
+        when(houseMemberRepository.findByHouseIdAndUserId(house.getId(), guest.getId())).thenReturn(Optional.of(targetMember));
+        when(expenseRepository.findByHouseIdAndSettledFalse(house.getId())).thenReturn(List.of(expense));
+
+        houseService.removeMember(house.getId(), guest.getId(), creator.getId());
+
+        assertFalse(targetMember.isActive());
+        verify(houseMemberRepository).save(targetMember);
+    }
+
+    @Test
     void removeMemberShouldFailWhenRequesterIsNotAdmin() {
         HouseMember requester = TestFixtures.houseMember(house, creator, HouseRole.MEMBER, "#6366f1");
 
