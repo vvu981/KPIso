@@ -6,42 +6,94 @@
 
 ## 📋 Alcance y Funcionalidades del Proyecto
 
-### 1. 📋 Gestión Gamificada de Deberes (Tareas)
-* **Sistema de Puntos KPI:** Cada tarea completada otorga puntos de recompensa (KPIs) a su ejecutor. Un marcador visible fomenta una sana competencia por mantener limpia la casa.
-* **Configuración de Asignación Flexible:**
+### 1. 📋 Gestión Gamificada de Deberes (Tareas) y Sistema de Puntos KPI
+KPIso introduce una mecánica gamificada para incentivar el cumplimiento a tiempo de las responsabilidades del hogar. El sistema evalúa el desempeño de los integrantes de forma mensual en función del estado de las tareas y sus asignaciones:
+
+* **Fórmula de Asignación Temporal:** Las tareas pueden asignarse bajo tres modalidades:
   * **Rotación Semanal:** Distribución rotativa periódica automática entre los miembros de la casa seleccionados.
   * **Tareas Fijas:** Asignación dedicada fija a un único conviviente.
-  * **Días Específicos:** Planificación fina en días específicos de la semana con proyección visual de ocurrencias.
-* **Calendario Interactivo:** Vista fluida en formato mensual y de listado que soporta **Drag-and-Drop** para reprogramar deberes de forma intuitiva, adaptando las fechas de vencimiento en caliente.
-* **Actualización en un Clic:** Panel interactivo para marcar tareas como completadas o pendientes con respuesta visual inmediata.
+  * **Días Específicos:** Planificación fina en días específicos de la semana con proyección visual en un calendario mensual interactivo.
+* **Cálculo Mensual de Puntos KPI:**
+  Se evalúan únicamente las tareas cuya fecha de evaluación (`completedAt` si está completada, o `dueDate` si está pendiente) pertenece al mes y año actuales. La puntuación individual de cada miembro se calcula según las siguientes reglas de negocio:
+  * **Caso A: Rescate con Retraso (Late Rescue):** Si una tarea es completada por un usuario (rescatador) que **no es el usuario asignado originalmente**, y la fecha de finalización (`completedAt`) es **posterior** a la fecha de vencimiento (`dueDate`):
+    * El usuario que completó la tarea (rescatador) recibe la totalidad de los puntos:
+      $$\text{Puntos}_{\text{rescatador}} \leftarrow \text{Puntos}_{\text{rescatador}} + \text{Puntos de la tarea}$$
+    * El usuario asignado originalmente (que no cumplió a tiempo) es penalizado restándole los puntos correspondientes:
+      $$\text{Puntos}_{\text{asignado}} \leftarrow \text{Puntos}_{\text{asignado}} - \text{Puntos de la tarea}$$
+  * **Caso B: Cumplimiento Normal:** Si la tarea es completada a tiempo, o es completada por el usuario que la tenía asignada, o se completó sin asignación previa:
+    * El usuario ejecutor se lleva la recompensa:
+      $$\text{Puntos}_{\text{ejecutor}} \leftarrow \text{Puntos}_{\text{ejecutor}} + \text{Puntos de la tarea}$$
+  * **Caso C: Tarea Pendiente Expirada:** Si una tarea sigue en estado `PENDING`, su fecha límite (`dueDate`) ya ha pasado (es menor que la hora actual) y tiene un conviviente asignado:
+    * El conviviente asignado es penalizado restándole los puntos de la tarea por negligencia:
+      $$\text{Puntos}_{\text{asignado}} \leftarrow \text{Puntos}_{\text{asignado}} - \text{Puntos de la tarea}$$
 
-### 2. 💶 Gastos Compartidos y Balances Proporcionales
-* **Registro de Gastos:** Introduce facturas, compras de suministros o servicios compartidos, detallando quién realizó el pago.
-* **Reparto Proporcional Exacto (`exactSplits`)**: Superando el modelo de división simple a partes iguales, KPIso permite definir de forma precisa la porción del importe total que le corresponde pagar a cada participante, adaptándose a consumos asimétricos.
-* **Panel de Saldos y Liquidación Recomendada**:
-  * Muestra el saldo neto global de cada conviviente (positivo o negativo) según sus aportaciones y consumos.
-  * **Motor de Liquidación Cruzada Inteligente**: Calcula de forma automática la cantidad exacta que cada deudor debe transferir a cada acreedor respetando de forma proporcional las divisiones personalizadas.
-* **Liquidación Instantánea**: Permite registrar transferencias individuales entre integrantes para saldar deudas pendientes con un solo clic.
+---
 
-### 3. 🛒 Lista de la Compra Inteligente e Integración de Checkout
-* **Buscador Asistido por API (Open Food Facts)**: Sugiere productos en tiempo real a medida que escribes e importa imágenes y precios estimados de forma automatizada.
-* **Selector de Asignación por Producto**: Mediante un menú desplegable interactivo, asocia en caliente qué integrantes consumirán cada producto de la lista.
-* **Checkout Integrado ("Pagar compra")**:
-  * Unifica la adquisición de todos los artículos pendientes en una sola acción.
-  * Permite establecer manualmente el precio total del ticket real pagado en el supermercado y el pagador del mismo.
-  * **Cálculo Proporcional de Compra**: Distribuye el importe real entre los convivientes basándose de forma proporcional en el peso estimado de cada artículo y sus consumidores asignados, registrando de forma automática un gasto con `exactSplits` en el sistema de cuentas de la casa.
-  * **Historial Agrupado por Transacciones**: Los productos comprados se archivan agrupados de forma independiente por cada checkout físico realizado, mostrando la fecha y hora de la compra (`Compra del DD/MM/YYYY a las HH:mm`), en lugar de una lista plana.
-  * **Sincronización en Tiempo Real**: Refresca automáticamente todo el panel lateral de balances y la lista de gastos general tras realizar el pago sin requerir recargar la página.
+### 2. 💶 Gastos Compartidos, Balances y Motor de Liquidación Cruzada
+El sistema financiero de KPIso rastrea cada aportación individual para calcular de forma transparente el saldo neto global de cada miembro del hogar, facilitando acuerdos justos sin fricciones.
+
+#### A. Reparto de Gastos (`exactSplits`)
+Cuando un usuario registra un gasto, este puede dividirse de dos maneras:
+1. **Reparto Equitativo por Defecto (Dividido al céntimo):** Si no se especifican coeficientes manuales, la aplicación divide el importe total equitativamente entre los participantes. Para evitar descuadres decimales originados por divisiones inexactas, el sistema realiza la distribución a nivel de céntimos:
+   * Se convierte el importe total a céntimos: $\text{TotalCéntimos} = \text{round}(\text{Importe} \times 100)$.
+   * Se obtiene la cuota base en céntimos: $\text{CuotaBase} = \lfloor \text{TotalCéntimos} / N \rfloor$ (donde $N$ es el número de participantes).
+   * El sobrante restante $\text{Remanente} = \text{TotalCéntimos} \pmod N$ se distribuye de a $1\text{ céntimo}$ de forma secuencial a los primeros participantes de la lista.
+2. **Reparto Proporcional Personalizado:** Los usuarios pueden definir un mapa de repartos exactos (`exactSplits`) asignando cantidades monetarias explícitas a cada integrante del gasto según su consumo real.
+
+#### B. Cálculo del Balance Neto Individual
+El balance neto global de cada conviviente ($U$) se determina analizando los gastos no liquidados (`settled = false`):
+$$\text{Balance}_U = \sum_{g \in \text{Gastos como Pagador}} \text{Importe}_g - \sum_{g \in \text{Gastos como Participante}} \text{Cuota de } U \text{ en } g$$
+* *Redondeo de Seguridad:* Si el valor absoluto del balance resultante es menor o igual a $0.05\text{ €}$, se ajusta automáticamente a $0.00\text{ €}$ para ignorar desajustes decimales insignificantes de redondeo.
+
+#### C. Motor de Liquidación Recomendada (Algoritmo de Matching)
+Para simplificar los cobros y evitar transferencias redundantes, KPIso implementa un algoritmo ávido (Greedy) que optimiza las transacciones de pago cruzado:
+1. Se extrae el balance neto de todos los miembros. Aquellos cuyos balances sean despreciables (valor absoluto $\le 0.01\text{ €}$) se excluyen de la liquidación.
+2. Se dividen en dos grupos:
+   * **Acreedores:** Integrantes con balance neto positivo ($\text{Balance} > 0$).
+   * **Deudores:** Integrantes con balance neto negativo ($\text{Balance} < 0$), representados por su deuda absoluta.
+3. Se ordenan ambos grupos y se van emparejando usando un proceso iterativo con punteros:
+   * En cada paso, el deudor actual transfiere al acreedor actual la cantidad mínima entre la deuda disponible y el crédito disponible:
+     $$\text{Importe de Transferencia} = \min(\text{Deuda Restante}, \text{Crédito Restante})$$
+   * Se descuenta dicha cantidad de ambos balances.
+   * Si la deuda del deudor se salda completamente, se avanza al siguiente deudor.
+   * Si el crédito del acreedor se cubre por completo, se avanza al siguiente acreedor.
+4. El motor genera una lista simplificada de transferencias recomendadas (ej. *"Usuario A debe transferir X € a Usuario B"*). Las deudas pueden saldarse registrando transferencias individuales o archivando en bloque todos los gastos corrientes como liquidados (`settled = true`).
+
+---
+
+### 3. 🛒 Lista de la Compra Inteligente y Checkout Proporcional
+La lista de la compra de KPIso agiliza el abastecimiento del hogar mediante la automatización de la estimación de costes y la integración con el sistema contable general.
+
+* **Buscador Asistido (Open Food Facts):** Al escribir el nombre de un artículo, el sistema realiza sugerencias en tiempo real consultando la base de datos externa de alimentos. Importa de forma automatizada las etiquetas de categoría del producto, su imagen promocional y estima un coste aproximado en base a su clasificación de catálogo (con soporte de sobrescritura de precio manual).
+* **Asignación de Consumidores:** Cada producto de la lista incluye un selector de usuarios asignados. Esto delimita quién va a consumir o beneficiarse de dicho producto. Si se deja vacío, se asume por defecto que el producto es consumido por todos los miembros del hogar.
+* **Algoritmo de Checkout y Prorrateo del Ticket:**
+  Cuando se realiza la compra física y se pulsa "Pagar compra", el usuario ingresa el **importe real pagado en el supermercado** ($\text{ImporteReal}$) y el pagador del ticket. El sistema realiza los siguientes pasos matemáticos para distribuir los costes justamente:
+  1. Se calcula el presupuesto estimado acumulado de todos los artículos pendientes en la lista:
+     $$\text{PresupuestoEstimado} = \sum_{i \in \text{Items Pendientes}} \text{PrecioEstimado}_i$$
+     *(Si el presupuesto estimado es 0, se toma como 1 para evitar divisiones por cero).*
+  2. Para cada producto individual ($i$) en la lista, se determina su proporción respecto al valor total de la cesta:
+     $$\text{Proporción}_i = \frac{\text{PrecioEstimado}_i}{\text{PresupuestoEstimado}}$$
+  3. Se calcula el coste real imputado a ese producto específico escalando el precio real total del ticket según su proporción:
+     $$\text{PrecioReal}_i = \text{ImporteReal} \times \text{Proporción}_i$$
+  4. El coste del producto se divide en partes iguales únicamente entre sus consumidores asignados ($C_i$):
+     $$\text{Cuota por Consumidor del Item}_i = \frac{\text{PrecioReal}_i}{|C_i|}$$
+  5. Se consolidan las porciones de todos los productos y se acumulan para cada usuario, generando un mapa de repartos exactos (`exactSplits`).
+  6. Los artículos de la lista se marcan como comprados (`status = BOUGHT`) y se les asigna un identificador único de transacción (`checkoutId`) que agrupa la compra cronológicamente.
+  7. Se registra automáticamente un nuevo Gasto compartido en el hogar con el título `"Compra DD/MM/YYYY"`, asignándole el importe real y el desglose de `exactSplits` calculado en el paso 5.
+
+---
 
 ### 4. 🛡️ Auditoría y Transparencia Total
-* **Registro de Actividades (Audit Trail)**: Panel inalterable que almacena y muestra de forma cronológica todas las acciones críticas (creación de tareas, cambios de asignaciones, eliminación de productos, registros de gastos y liquidaciones) detallando marcas de tiempo e identificadores de usuario para garantizar total claridad y confianza en la convivencia.
+* **Registro de Actividades (Audit Trail):** Todas las acciones críticas (creación, edición o eliminación de tareas y gastos, registros de checkouts de compras y liquidaciones) generan un registro inalterable que detalla la acción, el usuario responsable, la casa y la marca de tiempo exacta. Esto previene conflictos y asegura claridad absoluta en las cuentas e historial del hogar.
+
+---
 
 ### 5. 🎨 UX/UI Glassmorphism y Personalización Premium
-* **Estilo Visual Moderno**: Interfaz estilizada con efectos de desenfoque de fondo (`backdrop-filter`), sombras suaves y bordes redondeados.
-* **Modo Oscuro / Modo Claro Dinámico**: Toggle interactivo que adapta instantáneamente la combinación de colores y contrastes.
-* **Color Representativo**: Cada miembro del hogar puede elegir su color en formato hexadecimal para personalizar su presencia visual, teñir sus tareas asignadas y representarse en gráficos.
-* **Gestión de Perfil**: Panel para actualizar nombre de usuario, contraseña, dirección de correo, imagen de avatar mediante URL o desactivar la cuenta.
-* **Código de Invitación Único**: Sistema para invitar a nuevos convivientes al hogar de forma ágil y segura.
+* **Estilo Visual Moderno:** Interfaz estilizada con efectos de desenfoque de fondo (`backdrop-filter`), sombras suaves y bordes redondeados.
+* **Modo Oscuro / Modo Claro Dinámico:** Toggle interactivo que adapta instantáneamente la combinación de colores y contrastes.
+* **Color Representativo:** Cada miembro del hogar puede elegir su color en formato hexadecimal para personalizar su presencia visual, teñir sus tareas asignadas y representarse en gráficos.
+* **Gestión de Perfil:** Panel para actualizar nombre de usuario, contraseña, dirección de correo, imagen de avatar mediante URL o desactivar la cuenta.
+* **Código de Invitación Único:** Sistema para invitar a nuevos convivientes al hogar de forma ágil y segura.
 
 ---
 
