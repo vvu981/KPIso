@@ -73,10 +73,6 @@ public class TaskService {
                     .filter(HouseMember::isActive)
                     .collect(Collectors.toList());
 
-            if (activeMembers.isEmpty()) {
-                throw new IllegalArgumentException("No hay miembros activos para asignar la tarea");
-            }
-
             // Preparar la lista de fechas según el tipo de rotación y specificDays
             int occurrences = request.getOccurrencesToProject() != null ? request.getOccurrencesToProject() : 1;
             List<LocalDateTime> dates = new ArrayList<>();
@@ -115,6 +111,9 @@ public class TaskService {
             List<User> participants = new ArrayList<>();
             if (request.getParticipantIds() != null && !request.getParticipantIds().isEmpty()) {
                 for (UUID uid : request.getParticipantIds()) {
+                    if (!houseMemberRepository.existsByHouseIdAndUserId(request.getHouseId(), uid)) {
+                        throw new IllegalArgumentException("El usuario no pertenece a esta casa");
+                    }
                     User u = userRepository.findById(uid)
                             .orElseThrow(() -> new IllegalArgumentException("El usuario no pertenece a esta casa"));
                     participants.add(u);

@@ -244,7 +244,6 @@ class TaskServiceTest {
                 .build();
 
         when(houseRepository.findById(house.getId())).thenReturn(Optional.of(house));
-        when(userRepository.findById(assignee.getId())).thenReturn(Optional.of(assignee));
         when(houseMemberRepository.existsByHouseIdAndUserId(house.getId(), assignee.getId())).thenReturn(false);
 
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> taskService.createTask(request));

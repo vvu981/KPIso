@@ -107,7 +107,7 @@ class HouseServiceTest {
     void joinHouseShouldAddMemberToHouse() {
         when(houseRepository.findByInviteCode(house.getInviteCode())).thenReturn(Optional.of(house));
         when(userRepository.findById(guest.getId())).thenReturn(Optional.of(guest));
-        when(houseMemberRepository.existsByHouseIdAndUserId(house.getId(), guest.getId())).thenReturn(false);
+        when(houseMemberRepository.findByHouseIdAndUserId(house.getId(), guest.getId())).thenReturn(Optional.empty());
         when(houseMemberRepository.save(any(HouseMember.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         House joinedHouse = houseService.joinHouse(house.getInviteCode(), guest.getId());
@@ -149,7 +149,12 @@ class HouseServiceTest {
     void joinHouseShouldFailWhenUserIsAlreadyMember() {
         when(houseRepository.findByInviteCode(house.getInviteCode())).thenReturn(Optional.of(house));
         when(userRepository.findById(guest.getId())).thenReturn(Optional.of(guest));
-        when(houseMemberRepository.existsByHouseIdAndUserId(house.getId(), guest.getId())).thenReturn(true);
+        HouseMember existingMember = HouseMember.builder()
+                .house(house)
+                .user(guest)
+                .active(true)
+                .build();
+        when(houseMemberRepository.findByHouseIdAndUserId(house.getId(), guest.getId())).thenReturn(Optional.of(existingMember));
 
         IllegalStateException exception = assertThrows(IllegalStateException.class, () -> houseService.joinHouse(house.getInviteCode(), guest.getId()));
 
@@ -316,7 +321,8 @@ class HouseServiceTest {
 
         houseService.removeMember(house.getId(), guest.getId(), creator.getId());
 
-        verify(houseMemberRepository).delete(targetMember);
+        assertFalse(targetMember.isActive());
+        verify(houseMemberRepository).save(targetMember);
     }
 
     @Test
