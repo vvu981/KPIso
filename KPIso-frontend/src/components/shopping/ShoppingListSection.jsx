@@ -96,6 +96,15 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
     // openGroupDropdown: id del dropdown de asignación de grupo abierto
     const [openGroupDropdown, setOpenGroupDropdown] = useState(null);
 
+    // Modal de confirmación genérico
+    const [confirmModal, setConfirmModal] = useState(null);
+    // { title, message, onConfirm }
+
+    const openConfirmModal = (title, message, onConfirm) => {
+        setConfirmModal({ title, message, onConfirm });
+    };
+    const closeConfirmModal = () => setConfirmModal(null);
+
     /**
      * Calcula el modo de asignación de un grupo de items:
      * 'all'    → Todos (assignedUserIds vacío)
@@ -538,34 +547,64 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
             return;
         }
 
-        if (!confirm(`¿Estás seguro de que quieres eliminar "${itemName}"?`)) {
-            return;
-        }
+        openConfirmModal(
+            'Eliminar producto',
+            `¿Estás seguro de que quieres eliminar "${itemName}" de la lista?`,
+            async () => {
+                setLoadingItemId(itemId);
+                setError(null);
+                try {
+                    await api.delete(`/shopping-list/${itemId}`, {
+                        headers: token ? { Authorization: `Bearer ${token}` } : {}
+                    });
+                    const deletedItem = shoppingList.pendingItems.find(item => item.id === itemId);
+                    setShoppingList(prev => ({
+                        ...prev,
+                        pendingItems: prev.pendingItems.filter(item => item.id !== itemId),
+                        estimatedBudget: prev.estimatedBudget - (deletedItem?.estimatedPrice || 0)
+                    }));
+                    setSuccess(`"${itemName}" eliminado`);
+                    setTimeout(() => setSuccess(null), 2500);
+                } catch (err) {
+                    console.error('Error al eliminar producto:', err);
+                    setError('No se pudo eliminar el producto.');
+                } finally {
+                    setLoadingItemId(null);
+                }
+            }
+        );
+    };
 
-        setLoadingItemId(itemId);
-        setError(null);
-
-        try {
-            await api.delete(`/shopping-list/${itemId}`, {
-                headers: token ? { Authorization: `Bearer ${token}` } : {}
-            });
-
-            // Actualizar la lista
-            const deletedItem = shoppingList.pendingItems.find(item => item.id === itemId);
-            setShoppingList(prev => ({
-                ...prev,
-                pendingItems: prev.pendingItems.filter(item => item.id !== itemId),
-                estimatedBudget: prev.estimatedBudget - (deletedItem?.estimatedPrice || 0)
-            }));
-
-            setSuccess(`"${itemName}" eliminado`);
-            setTimeout(() => setSuccess(null), 2500);
-        } catch (err) {
-            console.error('Error al eliminar producto:', err);
-            setError('No se pudo eliminar el producto.');
-        } finally {
-            setLoadingItemId(null);
-        }
+    /**
+     * Limpia todos los productos pendientes de la lista.
+     */
+    const handleClearList = () => {
+        if (shoppingList.pendingItems.length === 0) return;
+        openConfirmModal(
+            'Limpiar lista de compra',
+            `Se eliminarán todos los productos pendientes (${shoppingList.pendingItems.length}). Esta acción no se puede deshacer.`,
+            async () => {
+                setLoading(true);
+                setError(null);
+                try {
+                    await api.delete(`/shopping-list/${houseId}/clear`, {
+                        headers: token ? { Authorization: `Bearer ${token}` } : {}
+                    });
+                    setShoppingList(prev => ({
+                        ...prev,
+                        pendingItems: [],
+                        estimatedBudget: 0
+                    }));
+                    setSuccess('Lista de compra limpiada correctamente.');
+                    setTimeout(() => setSuccess(null), 3000);
+                } catch (err) {
+                    console.error('Error al limpiar la lista:', err);
+                    setError('No se pudo limpiar la lista de compra.');
+                } finally {
+                    setLoading(false);
+                }
+            }
+        );
     };
 
     /**
@@ -636,6 +675,89 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
 
     return (
         <div className="space-y-6">
+            {/* Modal de confirmación genérico */}
+            {confirmModal && (
+                <div
+                    style={{
+                        position: 'fixed', inset: 0, zIndex: 9999,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: 'rgba(0,0,0,0.45)',
+                        backdropFilter: 'blur(4px)',
+                        WebkitBackdropFilter: 'blur(4px)'
+                    }}
+                    onClick={closeConfirmModal}
+                >
+                    <div
+                        style={{
+                            background: 'var(--bg-surface)',
+                            border: '1px solid var(--border-default)',
+                            borderRadius: 'var(--radius-xl, 16px)',
+                            boxShadow: 'var(--shadow-xl, 0 20px 60px rgba(0,0,0,0.3))',
+                            padding: '32px',
+                            maxWidth: '420px',
+                            width: '90%',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '16px'
+                        }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{
+                                width: 40, height: 40, borderRadius: '50%',
+                                background: 'var(--color-red-50, #fef2f2)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                flexShrink: 0
+                            }}>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                                    <line x1="12" y1="9" x2="12" y2="13"/>
+                                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                                </svg>
+                            </div>
+                            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                                {confirmModal.title}
+                            </h3>
+                        </div>
+                        <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                            {confirmModal.message}
+                        </p>
+                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '8px' }}>
+                            <button
+                                type="button"
+                                onClick={closeConfirmModal}
+                                style={{
+                                    padding: '9px 20px', borderRadius: 'var(--radius-md)',
+                                    border: '1px solid var(--border-default)',
+                                    background: 'var(--bg-surface)',
+                                    color: 'var(--text-primary)',
+                                    fontSize: '0.875rem', fontWeight: 500,
+                                    cursor: 'pointer', transition: 'background 0.15s'
+                                }}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => { confirmModal.onConfirm(); closeConfirmModal(); }}
+                                style={{
+                                    padding: '9px 20px', borderRadius: 'var(--radius-md)',
+                                    border: 'none',
+                                    background: '#ef4444',
+                                    color: '#fff',
+                                    fontSize: '0.875rem', fontWeight: 600,
+                                    cursor: 'pointer', transition: 'background 0.15s'
+                                }}
+                                onMouseEnter={e => { e.currentTarget.style.background = '#dc2626'; }}
+                                onMouseLeave={e => { e.currentTarget.style.background = '#ef4444'; }}
+                            >
+                                Confirmar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Mensajes de Error y Éxito */}
             {error && (
                 <Alert type="error" title="Error">
@@ -925,10 +1047,41 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
 
                 return (
                     <Card style={{ overflow: 'visible' }}>
-                        <div className="p-5 border-b border-gray-200">
+                    <div className="p-5 border-b border-gray-200 flex items-center justify-between gap-3">
                             <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
                                 Productos por Comprar ({shoppingList.pendingItems.length})
                             </h3>
+                            {!isReadOnly && (
+                                <button
+                                    type="button"
+                                    onClick={handleClearList}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        padding: '6px 14px',
+                                        borderRadius: 'var(--radius-md)',
+                                        border: '1px solid var(--color-red-300, #fca5a5)',
+                                        background: 'transparent',
+                                        color: 'var(--color-red-500, #ef4444)',
+                                        fontSize: '0.78rem',
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        transition: 'background 0.15s, color 0.15s'
+                                    }}
+                                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-red-50, #fef2f2)'; }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                                    title="Eliminar todos los productos pendientes"
+                                >
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <polyline points="3 6 5 6 21 6"/>
+                                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                                        <path d="M10 11v6M14 11v6"/>
+                                        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                                    </svg>
+                                    Limpiar lista
+                                </button>
+                            )}
                         </div>
                         <div className="divide-y divide-gray-200">
                             {groups.map(group => {

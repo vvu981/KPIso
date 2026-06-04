@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -218,6 +219,20 @@ public class ShoppingListController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
         } catch (Exception e) {
             log.error("Error al eliminar ítem de la lista de compra: {}", itemId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
+        }
+    }
+    /**
+     * Elimina todos los ítems PENDING de una vivienda (limpiar lista de compra).
+     */
+    @DeleteMapping("/{houseId}/clear")
+    public ResponseEntity<?> clearShoppingList(@PathVariable UUID houseId) {
+        log.info("DELETE /shopping-list/{}/clear - Limpiando lista de compra", houseId);
+        try {
+            int deleted = shoppingListService.clearPendingList(houseId);
+            return ResponseEntity.ok(Map.of("deleted", deleted));
+        } catch (Exception e) {
+            log.error("Error al limpiar la lista de compra para house: {}", houseId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
         }
     }

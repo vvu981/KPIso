@@ -10,6 +10,7 @@ RUN npm install --omit=dev
 
 # Copiar el código fuente
 COPY index.js ./
+COPY systemPrompt.md ./
 
 EXPOSE 3000
 

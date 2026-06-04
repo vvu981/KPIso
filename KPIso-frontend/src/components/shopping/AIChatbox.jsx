@@ -28,6 +28,7 @@ export default function AIChatbox({ houseId, currentUserId, loadShoppingList }) 
     const [addedMessageIds, setAddedMessageIds] = useState(new Set());
     // Selección individual de productos en las sugerencias
     const [selectedProducts, setSelectedProducts] = useState({}); // { [messageId]: [idx1, idx2...] }
+    const [rejectedProducts, setRejectedProducts] = useState({}); // { [messageId]: [idx1, idx2...] }
 
     const messagesEndRef = useRef(null);
 
@@ -103,6 +104,21 @@ export default function AIChatbox({ houseId, currentUserId, loadShoppingList }) 
                     [messageId]: [...currentSelected, index]
                 };
             }
+        });
+    };
+
+    // Rechazar producto sugerido
+    const handleRejectProduct = (messageId, index) => {
+        // Añadir a lista de rechazados
+        setRejectedProducts(prev => {
+            const current = new Set(prev[messageId] || []);
+            current.add(index);
+            return { ...prev, [messageId]: Array.from(current) };
+        });
+        // Quitar de seleccionados si estaba seleccionado
+        setSelectedProducts(prev => {
+            const sel = prev[messageId] || [];
+            return { ...prev, [messageId]: sel.filter(i => i !== index) };
         });
     };
 
@@ -261,11 +277,13 @@ export default function AIChatbox({ houseId, currentUserId, loadShoppingList }) 
                                             </p>
                                             <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1 no-scrollbar">
                                                 {msg.products.map((product, idx) => {
+                                                    // Omitir productos rechazados
+                                                    if ((rejectedProducts[msg.id] || []).includes(idx)) return null;
                                                     const isChecked = (selectedProducts[msg.id] || []).includes(idx);
                                                     return (
-                                                        <label
+                                                        <div
                                                             key={idx}
-                                                            className="flex items-center gap-2 p-1.5 rounded-lg border transition-all cursor-pointer text-[10px] select-none"
+                                                            className="flex items-center gap-2 p-1.5 rounded-lg border transition-all text-[10px] select-none"
                                                             style={{
                                                                 backgroundColor: isChecked ? 'var(--accent-ultra-light)' : 'var(--bg-surface)',
                                                                 borderColor: isChecked ? 'var(--accent-light)' : 'var(--border-subtle)',
@@ -275,7 +293,7 @@ export default function AIChatbox({ houseId, currentUserId, loadShoppingList }) 
                                                             <input
                                                                 type="checkbox"
                                                                 className="rounded focus:ring-indigo-500 h-3 w-3"
-                                                                style={{ accentColor: 'var(--accent)' }}
+                                                                style={{ accentColor: 'var(--accent)', cursor: addedMessageIds.has(msg.id) ? 'default' : 'pointer' }}
                                                                 checked={isChecked}
                                                                 disabled={addedMessageIds.has(msg.id)}
                                                                 onChange={() => handleToggleProductSelection(msg.id, idx)}
@@ -295,7 +313,28 @@ export default function AIChatbox({ houseId, currentUserId, loadShoppingList }) 
                                                                     {product.mainCategory?.replace('en:', '') || 'General'}
                                                                 </p>
                                                             </div>
-                                                        </label>
+                                                            {/* Botón rechazar */}
+                                                            <button
+                                                                type="button"
+                                                                disabled={addedMessageIds.has(msg.id)}
+                                                                onClick={() => handleRejectProduct(msg.id, idx)}
+                                                                title="Rechazar producto"
+                                                                style={{
+                                                                    marginLeft: '4px',
+                                                                    background: 'transparent',
+                                                                    border: 'none',
+                                                                    color: 'var(--text-secondary)',
+                                                                    cursor: addedMessageIds.has(msg.id) ? 'default' : 'pointer',
+                                                                    fontSize: '0.7rem',
+                                                                    lineHeight: 1,
+                                                                    padding: '2px 4px',
+                                                                    borderRadius: '4px',
+                                                                    flexShrink: 0
+                                                                }}
+                                                            >
+                                                                ✖
+                                                            </button>
+                                                        </div>
                                                     );
                                                 })}
                                             </div>

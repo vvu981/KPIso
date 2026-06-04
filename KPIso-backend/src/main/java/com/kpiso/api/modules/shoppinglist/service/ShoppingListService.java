@@ -240,6 +240,20 @@ public class ShoppingListService {
     }
 
     /**
+     * Elimina todos los ítems PENDING de una vivienda (limpiar lista).
+     */
+    @Transactional
+    public int clearPendingList(UUID houseId) {
+        log.info("Limpiando lista de compra pendiente para house: {}", houseId);
+        List<ShoppingItem> pendingItems = shoppingItemRepository
+                .findByHouseIdAndStatusOrderByCreatedAtDesc(houseId, ShoppingItemStatus.PENDING);
+        int count = pendingItems.size();
+        shoppingItemRepository.deleteAll(pendingItems);
+        log.info("Eliminados {} ítems pendientes para house: {}", count, houseId);
+        return count;
+    }
+
+    /**
      * Obtiene solo los ítems PENDING (sin comprar) de una vivienda.
      */
     @Transactional(readOnly = true)
