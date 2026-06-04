@@ -388,7 +388,8 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                     productName: pendingSuggestion.name,
                     houseId: houseId,
                     addedById: currentUserId,
-                    assignedUserIds: []
+                    assignedUserIds: [],
+                    manualPrice: pendingSuggestion.estimatedPrice
                 }, {
                     headers: token ? { Authorization: `Bearer ${token}` } : {}
                 });
