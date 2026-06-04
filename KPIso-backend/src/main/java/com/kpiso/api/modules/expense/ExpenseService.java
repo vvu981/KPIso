@@ -130,17 +130,10 @@ public class ExpenseService {
             UUID payerId = e.getPaidBy().getId();
             rawBalances.put(payerId, rawBalances.getOrDefault(payerId, BigDecimal.ZERO).add(e.getAmount()));
 
-            if (e.getExactSplits() != null && !e.getExactSplits().isEmpty()) {
-                for (java.util.Map.Entry<UUID, BigDecimal> entry : e.getExactSplits().entrySet()) {
-                    UUID pId = entry.getKey();
-                    rawBalances.put(pId, rawBalances.getOrDefault(pId, BigDecimal.ZERO).subtract(entry.getValue()));
-                }
-            } else {
-                BigDecimal share = e.getAmount().divide(BigDecimal.valueOf(e.getParticipants().size()), 2, java.math.RoundingMode.HALF_UP);
-                for (User participant : e.getParticipants()) {
-                    UUID pId = participant.getId();
-                    rawBalances.put(pId, rawBalances.getOrDefault(pId, BigDecimal.ZERO).subtract(share));
-                }
+            Map<UUID, BigDecimal> splits = calculateSplits(e);
+            for (Map.Entry<UUID, BigDecimal> entry : splits.entrySet()) {
+                UUID pId = entry.getKey();
+                rawBalances.put(pId, rawBalances.getOrDefault(pId, BigDecimal.ZERO).subtract(entry.getValue()));
             }
         }
 
@@ -189,8 +182,12 @@ public class ExpenseService {
         Map<UUID, MemberStatusResponse> statuses = new HashMap<>();
         for (HouseMember m : members) {
             UUID uId = m.getUser().getId();
+            BigDecimal bal = rawBalances.get(uId);
+            if (bal != null && bal.abs().compareTo(BigDecimal.valueOf(0.05)) <= 0) {
+                bal = BigDecimal.ZERO;
+            }
             statuses.put(uId, MemberStatusResponse.builder()
-                    .balance(rawBalances.get(uId))
+                    .balance(bal)
                     .color(colors.get(uId))
                     .points(pointsMap.get(uId))
                     .build());
@@ -214,16 +211,11 @@ public class ExpenseService {
         for (Expense e : expenses) {
             UUID payerId = e.getPaidBy().getId();
             balances.put(payerId, balances.getOrDefault(payerId, BigDecimal.ZERO).add(e.getAmount()));
-            if (e.getExactSplits() != null && !e.getExactSplits().isEmpty()) {
-                for (Map.Entry<UUID, BigDecimal> entry : e.getExactSplits().entrySet()) {
-                    UUID pId = entry.getKey();
-                    balances.put(pId, balances.getOrDefault(pId, BigDecimal.ZERO).subtract(entry.getValue()));
-                }
-            } else {
-                BigDecimal share = e.getAmount().divide(BigDecimal.valueOf(e.getParticipants().size()), 2, RoundingMode.HALF_UP);
-                for (User p : e.getParticipants()) {
-                    balances.put(p.getId(), balances.getOrDefault(p.getId(), BigDecimal.ZERO).subtract(share));
-                }
+            
+            Map<UUID, BigDecimal> splits = calculateSplits(e);
+            for (Map.Entry<UUID, BigDecimal> entry : splits.entrySet()) {
+                UUID pId = entry.getKey();
+                balances.put(pId, balances.getOrDefault(pId, BigDecimal.ZERO).subtract(entry.getValue()));
             }
         }
 
@@ -231,8 +223,12 @@ public class ExpenseService {
         List<Map.Entry<UUID, BigDecimal>> creditors = new ArrayList<>();
 
         for (Map.Entry<UUID, BigDecimal> entry : balances.entrySet()) {
-            if (entry.getValue().compareTo(BigDecimal.valueOf(0.01)) > 0) creditors.add(new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue()));
-            else if (entry.getValue().compareTo(BigDecimal.valueOf(-0.01)) < 0) debtors.add(new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue().abs()));
+            BigDecimal bal = entry.getValue();
+            if (bal.abs().compareTo(BigDecimal.valueOf(0.01)) <= 0) {
+                continue;
+            }
+            if (bal.compareTo(BigDecimal.ZERO) > 0) creditors.add(new AbstractMap.SimpleEntry<>(entry.getKey(), bal));
+            else if (bal.compareTo(BigDecimal.ZERO) < 0) debtors.add(new AbstractMap.SimpleEntry<>(entry.getKey(), bal.abs()));
         }
 
         List<DebtSettlementResponse> settlements = new ArrayList<>();
@@ -245,10 +241,35 @@ public class ExpenseService {
             settlements.add(DebtSettlementResponse.builder().debtorId(debtor.getKey()).debtorUsername(usernames.get(debtor.getKey())).creditorId(creditor.getKey()).creditorUsername(usernames.get(creditor.getKey())).amount(minAmount).build());
             debtor.setValue(debtor.getValue().subtract(minAmount));
             creditor.setValue(creditor.getValue().subtract(minAmount));
-            if (debtor.getValue().compareTo(BigDecimal.valueOf(0.01)) < 0) dIdx++;
-            if (creditor.getValue().compareTo(BigDecimal.valueOf(0.01)) < 0) cIdx++;
+            if (debtor.getValue().compareTo(BigDecimal.ZERO) <= 0) dIdx++;
+            if (creditor.getValue().compareTo(BigDecimal.ZERO) <= 0) cIdx++;
         }
         return settlements;
+    }
+
+    private Map<UUID, BigDecimal> calculateSplits(Expense e) {
+        Map<UUID, BigDecimal> splits = new HashMap<>();
+        if (e.getExactSplits() != null && !e.getExactSplits().isEmpty()) {
+            return e.getExactSplits();
+        }
+
+        List<User> participants = e.getParticipants();
+        int numParticipants = participants.size();
+        if (numParticipants == 0) {
+            return splits;
+        }
+
+        long totalCents = e.getAmount().movePointRight(2).setScale(0, RoundingMode.HALF_UP).longValue();
+        long baseShareCents = totalCents / numParticipants;
+        long remainderCents = totalCents % numParticipants;
+
+        for (int i = 0; i < numParticipants; i++) {
+            long cents = baseShareCents + (i < remainderCents ? 1 : 0);
+            BigDecimal share = BigDecimal.valueOf(cents).movePointLeft(2);
+            splits.put(participants.get(i).getId(), share);
+        }
+
+        return splits;
     }
 
     @Transactional

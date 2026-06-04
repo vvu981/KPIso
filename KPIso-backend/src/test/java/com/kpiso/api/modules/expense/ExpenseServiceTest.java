@@ -434,6 +434,76 @@ class ExpenseServiceTest {
     }
 
     @Test
+    void calculateSettlementsShouldDistributeCentsExactly() {
+        User memberA = TestFixtures.user("ana", "ana@email.com");
+        User memberB = TestFixtures.user("bea", "bea@email.com");
+        User memberC = TestFixtures.user("carla", "carla@email.com");
+
+        HouseMember houseMemberA = TestFixtures.houseMember(house, memberA, HouseRole.ADMIN, "#ff0000");
+        HouseMember houseMemberB = TestFixtures.houseMember(house, memberB, HouseRole.MEMBER, "#00ff00");
+        HouseMember houseMemberC = TestFixtures.houseMember(house, memberC, HouseRole.MEMBER, "#0000ff");
+
+        // 10.00 divided by 3 has remainder cents.
+        // It should distribute: 3.34 to memberA, 3.33 to memberB, 3.33 to memberC.
+        // Since memberA paid 10.00, memberA's net change is 10.00 - 3.34 = +6.66.
+        // memberB's net change is -3.33.
+        // memberC's net change is -3.33.
+        // Sum of balances: 6.66 - 3.33 - 3.33 = 0.00.
+        Expense expense = Expense.builder()
+                .id(UUID.randomUUID())
+                .title("Compra no divisible exacta")
+                .amount(new BigDecimal("10.00"))
+                .house(house)
+                .paidBy(memberA)
+                .participants(List.of(memberA, memberB, memberC))
+                .settled(false)
+                .build();
+
+        when(houseMemberRepository.findByHouseId(house.getId())).thenReturn(List.of(houseMemberA, houseMemberB, houseMemberC));
+        when(expenseRepository.findByHouseIdAndSettledFalse(house.getId())).thenReturn(List.of(expense));
+
+        List<DebtSettlementResponse> settlements = expenseService.calculateSettlements(house.getId());
+
+        // Ana is creditor with 6.66
+        // Bea owes 3.33, Carla owes 3.33
+        assertEquals(2, settlements.size());
+        BigDecimal totalSettled = settlements.stream()
+                .map(DebtSettlementResponse::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        assertEquals(new BigDecimal("6.66"), totalSettled);
+    }
+
+    @Test
+    void calculateSettlementsShouldIgnoreOneCentDebts() {
+        User memberA = TestFixtures.user("ana", "ana@email.com");
+        User memberB = TestFixtures.user("bea", "bea@email.com");
+
+        HouseMember houseMemberA = TestFixtures.houseMember(house, memberA, HouseRole.ADMIN, "#ff0000");
+        HouseMember houseMemberB = TestFixtures.houseMember(house, memberB, HouseRole.MEMBER, "#00ff00");
+
+        // 1 cent expense paid by Ana, Bea is participant.
+        // Ana's net change is +0.01 (paid) - 0.00 (not participant) = +0.01.
+        // Bea's net change is -0.01 (participant).
+        // Since the debt is exactly 0.01, it must be ignored/treated as 0.00.
+        Expense expense = Expense.builder()
+                .id(UUID.randomUUID())
+                .title("Gasto de un centimo")
+                .amount(new BigDecimal("0.01"))
+                .house(house)
+                .paidBy(memberA)
+                .participants(List.of(memberB))
+                .settled(false)
+                .build();
+
+        when(houseMemberRepository.findByHouseId(house.getId())).thenReturn(List.of(houseMemberA, houseMemberB));
+        when(expenseRepository.findByHouseIdAndSettledFalse(house.getId())).thenReturn(List.of(expense));
+
+        List<DebtSettlementResponse> settlements = expenseService.calculateSettlements(house.getId());
+
+        assertEquals(0, settlements.size());
+    }
+
+    @Test
     void settleAllHouseExpensesShouldMarkExpensesAsSettled() {
         Expense expenseA = Expense.builder().id(UUID.randomUUID()).title("Compra A").amount(new BigDecimal("10.00")).house(house).paidBy(payer).participants(List.of(participantA)).settled(false).build();
         Expense expenseB = Expense.builder().id(UUID.randomUUID()).title("Compra B").amount(new BigDecimal("5.00")).house(house).paidBy(payer).participants(List.of(participantA)).settled(false).build();
