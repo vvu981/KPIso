@@ -875,7 +875,7 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                 const groups = Object.values(groupMap);
 
                 return (
-                    <Card>
+                    <Card style={{ overflow: 'visible' }}>
                         <div className="p-5 border-b border-gray-200">
                             <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
                                 Productos por Comprar ({shoppingList.pendingItems.length})
@@ -890,11 +890,13 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                                 const totalEst = group.items.reduce((s, i) => s + (i.estimatedPrice || 0), 0);
                                 const isGroupDropOpen = openGroupDropdown === group.key;
 
-                                const assignLabel = assignMode === 'all'
-                                    ? 'Todos'
-                                    : assignMode === 'single'
-                                        ? (houseMembers.find(m => m.userId === assignUserId)?.username || 'Usuario')
-                                        : 'Personalizado';
+                                const assignLabel = qty === 1
+                                    ? getAssigneesLabel(rep.assignedUserIds)
+                                    : assignMode === 'all'
+                                        ? 'Todos'
+                                        : assignMode === 'single'
+                                            ? (houseMembers.find(m => m.userId === assignUserId)?.username || 'Usuario')
+                                            : 'Personalizado';
 
                                 return (
                                     <div key={group.key}>
@@ -962,55 +964,85 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                                                                         style={{ position: 'fixed', inset: 0, zIndex: 40 }}
                                                                         onClick={() => setOpenGroupDropdown(null)}
                                                                     />
-                                                                    <div className="absolute right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-2 min-w-[190px] z-50 flex flex-col gap-1">
-                                                                        <div className="px-2 py-1 text-[10px] uppercase tracking-wider font-semibold text-gray-400 border-b border-gray-100 mb-1">
-                                                                            Pagar por:
-                                                                        </div>
-                                                                        {/* Opción Todos */}
-                                                                        <button
-                                                                            type="button"
-                                                                            className={`flex items-center gap-2 px-2 py-1.5 rounded text-xs font-medium hover:bg-gray-50 w-full text-left transition-colors ${
-                                                                                assignMode === 'all' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700'
-                                                                            }`}
-                                                                            onClick={() => { handleSetGroupAssignment(group.items, 'all'); setOpenGroupDropdown(null); }}
-                                                                        >
-                                                                            <span style={{ width: 14, display: 'inline-block' }}>{assignMode === 'all' ? '✓' : ''}</span>
-                                                                            Todos (equitativo)
-                                                                        </button>
-                                                                        {/* Opción por usuario */}
-                                                                        {houseMembers.map(m => (
-                                                                            <button
-                                                                                key={m.userId}
-                                                                                type="button"
-                                                                                className={`flex items-center gap-2 px-2 py-1.5 rounded text-xs font-medium hover:bg-gray-50 w-full text-left transition-colors ${
-                                                                                    assignMode === 'single' && assignUserId === m.userId ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700'
-                                                                                }`}
-                                                                                onClick={() => { handleSetGroupAssignment(group.items, 'single', m.userId); setOpenGroupDropdown(null); }}
-                                                                            >
-                                                                                <span style={{ width: 14, display: 'inline-block' }}>
-                                                                                    {assignMode === 'single' && assignUserId === m.userId ? '✓' : ''}
-                                                                                </span>
-                                                                                {m.username}
-                                                                            </button>
-                                                                        ))}
-                                                                        {/* Opción Personalizado — solo visible si hay >1 item */}
-                                                                        {qty > 1 && (
+                                                                    <div 
+                                                                        className="absolute right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-2 min-w-[190px] flex flex-col gap-1"
+                                                                        style={{ zIndex: 1000 }}
+                                                                    >
+                                                                        {qty === 1 ? (
                                                                             <>
-                                                                                <div className="border-t border-gray-100 my-1" />
+                                                                                <div className="px-2 py-1 text-[10px] uppercase tracking-wider font-semibold text-gray-400 border-b border-gray-100 mb-1">
+                                                                                    Asignar a:
+                                                                                </div>
+                                                                                {houseMembers.map(member => {
+                                                                                    const checked = !rep.assignedUserIds || rep.assignedUserIds.length === 0 || rep.assignedUserIds.includes(member.userId);
+                                                                                    return (
+                                                                                        <label
+                                                                                            key={member.userId}
+                                                                                            className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer text-xs select-none"
+                                                                                        >
+                                                                                            <input
+                                                                                                type="checkbox"
+                                                                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
+                                                                                                checked={checked}
+                                                                                                onChange={() => handleToggleMember(rep, member.userId)}
+                                                                                            />
+                                                                                            <span className="text-gray-700 font-medium">{member.username}</span>
+                                                                                        </label>
+                                                                                    );
+                                                                                })}
+                                                                            </>
+                                                                        ) : (
+                                                                            <>
+                                                                                <div className="px-2 py-1 text-[10px] uppercase tracking-wider font-semibold text-gray-400 border-b border-gray-100 mb-1">
+                                                                                    Pagar por:
+                                                                                </div>
+                                                                                {/* Opción Todos */}
                                                                                 <button
                                                                                     type="button"
                                                                                     className={`flex items-center gap-2 px-2 py-1.5 rounded text-xs font-medium hover:bg-gray-50 w-full text-left transition-colors ${
-                                                                                        assignMode === 'custom' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700'
+                                                                                        assignMode === 'all' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700'
                                                                                     }`}
-                                                                                    onClick={() => {
-                                                                                        // Personalizado: simplemente expandir el grupo y cerrar dropdown
-                                                                                        setExpandedGroups(prev => { const n = new Set(prev); n.add(group.key); return n; });
-                                                                                        setOpenGroupDropdown(null);
-                                                                                    }}
+                                                                                    onClick={() => { handleSetGroupAssignment(group.items, 'all'); setOpenGroupDropdown(null); }}
                                                                                 >
-                                                                                    <span style={{ width: 14, display: 'inline-block' }}>{assignMode === 'custom' ? '✓' : ''}</span>
-                                                                                    Personalizado
+                                                                                    <span style={{ width: 14, display: 'inline-block' }}>{assignMode === 'all' ? '✓' : ''}</span>
+                                                                                    Todos (equitativo)
                                                                                 </button>
+                                                                                {/* Opción por usuario */}
+                                                                                {houseMembers.map(m => (
+                                                                                    <button
+                                                                                        key={m.userId}
+                                                                                        type="button"
+                                                                                        className={`flex items-center gap-2 px-2 py-1.5 rounded text-xs font-medium hover:bg-gray-50 w-full text-left transition-colors ${
+                                                                                            assignMode === 'single' && assignUserId === m.userId ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700'
+                                                                                        }`}
+                                                                                        onClick={() => { handleSetGroupAssignment(group.items, 'single', m.userId); setOpenGroupDropdown(null); }}
+                                                                                    >
+                                                                                        <span style={{ width: 14, display: 'inline-block' }}>
+                                                                                            {assignMode === 'single' && assignUserId === m.userId ? '✓' : ''}
+                                                                                        </span>
+                                                                                        {m.username}
+                                                                                    </button>
+                                                                                ))}
+                                                                                {/* Opción Personalizado — solo visible si hay >1 item */}
+                                                                                {qty > 1 && (
+                                                                                    <>
+                                                                                        <div className="border-t border-gray-100 my-1" />
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            className={`flex items-center gap-2 px-2 py-1.5 rounded text-xs font-medium hover:bg-gray-50 w-full text-left transition-colors ${
+                                                                                                assignMode === 'custom' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700'
+                                                                                            }`}
+                                                                                            onClick={() => {
+                                                                                                // Personalizado: simplemente expandir el grupo y cerrar dropdown
+                                                                                                setExpandedGroups(prev => { const n = new Set(prev); n.add(group.key); return n; });
+                                                                                                setOpenGroupDropdown(null);
+                                                                                            }}
+                                                                                        >
+                                                                                            <span style={{ width: 14, display: 'inline-block' }}>{assignMode === 'custom' ? '✓' : ''}</span>
+                                                                                            Personalizado
+                                                                                        </button>
+                                                                                    </>
+                                                                                )}
                                                                             </>
                                                                         )}
                                                                     </div>
@@ -1095,7 +1127,10 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                                                                         style={{ position: 'fixed', inset: 0, zIndex: 40 }}
                                                                         onClick={() => setOpenDropdownId(null)}
                                                                     />
-                                                                    <div className="absolute right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-2 min-w-[160px] z-50 flex flex-col gap-1">
+                                                                    <div 
+                                                                        className="absolute right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-2 min-w-[160px] flex flex-col gap-1"
+                                                                        style={{ zIndex: 1000 }}
+                                                                    >
                                                                         <div className="px-2 py-1 text-[10px] uppercase tracking-wider font-semibold text-gray-400 border-b border-gray-100 mb-1">
                                                                             Asignar a:
                                                                         </div>
@@ -1145,7 +1180,10 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                             })}
                         </div>
                         {/* Footer con presupuesto y checkout */}
-                        <div className="p-5 bg-gray-50 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4">
+                        <div 
+                            className="p-5 bg-gray-50 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4"
+                            style={{ borderBottomLeftRadius: 'var(--radius-lg)', borderBottomRightRadius: 'var(--radius-lg)' }}
+                        >
                             <div className="flex items-baseline gap-2">
                                 <span className="text-sm font-medium text-gray-500">Presupuesto Estimado:</span>
                                 <span className="text-2xl font-bold text-blue-600">
