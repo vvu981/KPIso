@@ -75,7 +75,12 @@ class ShoppingListServiceTest {
     @Test
     void searchProductSuggestionsShouldReturnSuggestions() {
         String query = "leche";
-        ProductDetails details = new ProductDetails("Leche Desnatada", "https://image.com", "dairy", true);
+        ProductDetails details = ProductDetails.builder()
+                .name("Leche Desnatada")
+                .imageUrl("https://image.com")
+                .categoryTags("dairy")
+                .found(true)
+                .build();
         when(scraperServiceAdapter.searchProductSuggestions(query, false)).thenReturn(List.of(details));
         when(priceEstimatorService.estimatePrice("dairy")).thenReturn(1.50);
 
@@ -118,7 +123,12 @@ class ShoppingListServiceTest {
                 .manualPrice(1.20)
                 .build();
 
-        ProductDetails details = new ProductDetails("Manzana Fuji", "https://manzana.jpg", "fruits", true);
+        ProductDetails details = ProductDetails.builder()
+                .name("Manzana Fuji")
+                .imageUrl("https://manzana.jpg")
+                .categoryTags("fruits")
+                .found(true)
+                .build();
         when(productCatalogClient.searchProduct("Manzana")).thenReturn(details);
         when(priceEstimatorService.estimatePrice("fruits")).thenReturn(0.90);
         when(shoppingItemRepository.save(any(ShoppingItem.class))).thenAnswer(invocation -> {

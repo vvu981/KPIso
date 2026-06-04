@@ -15,6 +15,21 @@ jobs:
     name: Backend Build & Test
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: kpiso
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -28,6 +43,10 @@ jobs:
 
       - name: Build & Run Tests
         working-directory: ./KPIso-backend
+        env:
+          DATABASE_URL: jdbc:postgresql://localhost:5432/kpiso
+          DATABASE_USERNAME: postgres
+          DATABASE_PASSWORD: postgres
         run: mvn -B clean verify
 
       - name: Upload JaCoCo Coverage Report
