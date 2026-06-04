@@ -66,7 +66,7 @@ function AppContent() {
             <main
                 className="flex-1"
                 style={{
-                    paddingTop: 'var(--navbar-height)',
+                    paddingTop: auth?.username ? 0 : 'var(--navbar-height)',
                     paddingBottom: 'var(--space-8)',
                 }}
             >
