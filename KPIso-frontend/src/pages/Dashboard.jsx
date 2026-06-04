@@ -415,7 +415,7 @@ function HouseCard({ house, isDeleted, onDelete }) {
     const initial = house.name.charAt(0).toUpperCase();
 
     return (
-        <Card interactive={!isDeleted} padding="none" className="anim-fade-in">
+        <Card interactive={true} padding="none" className="anim-fade-in">
             <div style={{ padding: 'var(--space-6)' }}>
                 {/* Header: Avatar + Nombre */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', marginBottom: 'var(--space-5)' }}>
@@ -478,9 +478,22 @@ function HouseCard({ house, isDeleted, onDelete }) {
 
                 {/* Footer: Estado + Acciones */}
                 {isDeleted ? (
-                    <Badge variant="neutral" size="sm">
-                        Eliminada
-                    </Badge>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
+                        <Link
+                            to={`/house/${house.id}`}
+                            style={{
+                                flex: 1,
+                                textDecoration: 'none',
+                            }}
+                        >
+                            <Button variant="secondary" size="sm" full>
+                                Entrar (Solo Lectura)
+                            </Button>
+                        </Link>
+                        <Badge variant="neutral" size="sm">
+                            Eliminada
+                        </Badge>
+                    </div>
                 ) : (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
                         <Link

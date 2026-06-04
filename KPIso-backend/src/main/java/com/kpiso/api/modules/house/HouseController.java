@@ -42,10 +42,12 @@ public class HouseController {
     }
 
     @GetMapping("/{houseId}")
-    public ResponseEntity<HouseDetailResponse> getHouseDetail(@PathVariable UUID houseId) {
+    public ResponseEntity<HouseDetailResponse> getHouseDetail(@PathVariable UUID houseId, @RequestParam UUID userId) {
         try {
-            HouseDetailResponse houseDetail = houseService.getHouseDetail(houseId);
+            HouseDetailResponse houseDetail = houseService.getHouseDetail(houseId, userId);
             return ResponseEntity.ok(houseDetail);
+        } catch (org.springframework.security.access.AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }

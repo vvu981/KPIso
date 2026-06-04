@@ -151,7 +151,7 @@ export default function HouseDetail() {
     const fetchData = async () => {
         try {
             const [houseRes, tasksRes, expensesRes, settlementRes, statusRes] = await Promise.all([
-                api.get(`/houses/${houseId}`),
+                api.get(`/houses/${houseId}?userId=${currentUserId}`),
                 api.get(`/tasks/house/${houseId}`),
                 api.get(`/expenses/house/${houseId}`),
                 api.get(`/expenses/house/${houseId}/settlement`),
@@ -164,7 +164,12 @@ export default function HouseDetail() {
             setSettlements(settlementRes.data);
             setMemberStatuses(statusRes.data);
         } catch (err) {
-            setError('Error al cargar la vivienda. Intenta más tarde.');
+            if (err.response?.status === 403) {
+                setError('Acceso denegado: No eres miembro participante ni tienes acceso autorizado a esta vivienda.');
+                setTimeout(() => navigate('/'), 3000);
+            } else {
+                setError('Error al cargar la vivienda. Intenta más tarde.');
+            }
         } finally {
             setLoading(false);
         }
@@ -476,6 +481,15 @@ export default function HouseDetail() {
                 isAdmin={selfIsAdmin}
             />
 
+            {house.isReadOnly && (
+                <div style={{ maxWidth: '1200px', margin: 'var(--space-4) auto 0 auto', padding: '0 var(--space-4)' }}>
+                    <Alert
+                        type="warning"
+                        message="Modo de solo lectura: Has sido expulsado de esta vivienda o ha sido eliminada."
+                    />
+                </div>
+            )}
+
             {/* Contenido Principal */}
             <main
                 style={{
@@ -505,6 +519,7 @@ export default function HouseDetail() {
                             });
                             setShowEditProfileModal(true);
                         }}
+                        isReadOnly={house.isReadOnly}
                     />
                 </aside>
 
@@ -544,6 +559,7 @@ export default function HouseDetail() {
                             }
                             selectedUserFilter={selectedUserFilter}
                             onUserFilterChange={setSelectedUserFilter}
+                            isReadOnly={house.isReadOnly}
                         />
                     )}
 
@@ -570,6 +586,7 @@ export default function HouseDetail() {
                             houseId={houseId}
                             currentUserId={currentUserId}
                             onPurchaseRegistered={fetchData}
+                            isReadOnly={house.isReadOnly}
                         />
                     )}
 
@@ -619,6 +636,7 @@ export default function HouseDetail() {
                     onClose={() => setSelectedTask(null)}
                     onEdit={() => startEditTask(selectedTask)}
                     onDelete={() => handleDeleteTask(selectedTask.id)}
+                    isReadOnly={house.isReadOnly}
                 />
             )}
         </div>
@@ -708,21 +726,23 @@ function HouseDetailHeader({ house, activeTab, onTabChange, onEditClick, onDelet
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                    <Button variant="secondary" size="sm" onClick={onEditClick} title="Editar vivienda">
-                        <IconPencil />
-                    </Button>
-                    {isAdmin && (
-                        <Button
-                            variant="danger"
-                            size="sm"
-                            onClick={onDeleteClick}
-                            title="Eliminar vivienda"
-                        >
-                            <IconTrash />
+                {!house.isReadOnly && (
+                    <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                        <Button variant="secondary" size="sm" onClick={onEditClick} title="Editar vivienda">
+                            <IconPencil />
                         </Button>
-                    )}
-                </div>
+                        {isAdmin && (
+                            <Button
+                                variant="danger"
+                                size="sm"
+                                onClick={onDeleteClick}
+                                title="Eliminar vivienda"
+                            >
+                                <IconTrash />
+                            </Button>
+                        )}
+                    </div>
+                )}
             </div>
 
             <div
@@ -778,6 +798,7 @@ function HouseSidebar({
                           isAdmin,
                           onColorChange,
                           onEditProfile,
+                          isReadOnly,
                       }) {
     return (
         <Card padding="lg" glass>
@@ -852,7 +873,7 @@ function HouseSidebar({
                                 <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-bold)', color: status.balance >= 0 || sidebarView === 'points' ? 'var(--success)' : 'var(--danger)' }}>
                                     {status.balance > 0 && sidebarView === 'money' ? '+' : ''}{value}
                                 </span>
-                                {member.userId === currentUserId && (
+                                {member.userId === currentUserId && !isReadOnly && (
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
                                         <input
                                             type="color"
@@ -863,7 +884,7 @@ function HouseSidebar({
                                         
                                     </div>
                                 )}
-                                {isAdmin && member.userId !== currentUserId && (
+                                {isAdmin && member.userId !== currentUserId && !isReadOnly && (
                                     <Button
                                         variant="ghost"
                                         size="sm"
@@ -911,6 +932,7 @@ function TasksSection({
                           onNextMonth,
                           selectedUserFilter,
                           onUserFilterChange,
+                          isReadOnly,
                       }) {
     const now = new Date();
 
@@ -955,7 +977,7 @@ function TasksSection({
                         <IconClipboardDocumentList /> Deberes & Tareas
                     </span>
                 </h2>
-                {!showTaskForm && (
+                {!showTaskForm && !isReadOnly && (
                     <Button variant="primary" size="sm" onClick={onAddTask}>
                         ＋ Nueva Tarea
                     </Button>
@@ -1039,6 +1061,7 @@ function TasksSection({
                                             onEdit={() => onEditTask(task)}
                                             onDelete={() => onDeleteTask(task.id)}
                                             onToggleStatus={() => onToggleStatus(task.id, task.status)}
+                                            isReadOnly={isReadOnly}
                                         />
                                     );
                                 })
@@ -1122,7 +1145,7 @@ function TasksSection({
 /**
  * TaskListItem — Componente individual para tarea en lista
  */
-function TaskListItem({ task, isExpired, onSelect, onEdit, onDelete, onToggleStatus }) {
+function TaskListItem({ task, isExpired, onSelect, onEdit, onDelete, onToggleStatus, isReadOnly }) {
     return (
         <div
             onClick={onSelect}
@@ -1155,38 +1178,40 @@ function TaskListItem({ task, isExpired, onSelect, onEdit, onDelete, onToggleSta
                         Responsable: {task.assignedTo?.username || 'Cualquiera'} | {task.points} 🪙 KPI
                     </p>
                 </div>
-                <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-                    <Button
-                        variant={isExpired ? 'danger' : 'secondary'}
-                        size="sm"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onToggleStatus();
-                        }}
-                    >
-                        {task.status === 'PENDING' ? (isExpired ? '⚡ Rescatar' : <><IconCheck /> Hecho</>) : <><IconXMark /> Reabrir</>}
-                    </Button>
-                    <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onEdit();
-                        }}
-                    >
-                        <IconPencil />
-                    </Button>
-                    <Button
-                        variant="danger"
-                        size="sm"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onDelete();
-                        }}
-                    >
-                        <IconTrash />
-                    </Button>
-                </div>
+                {!isReadOnly && (
+                    <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+                        <Button
+                            variant={isExpired ? 'danger' : 'secondary'}
+                            size="sm"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onToggleStatus();
+                            }}
+                        >
+                            {task.status === 'PENDING' ? (isExpired ? '⚡ Rescatar' : <><IconCheck /> Hecho</>) : <><IconXMark /> Reabrir</>}
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onEdit();
+                            }}
+                        >
+                            <IconPencil />
+                        </Button>
+                        <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onDelete();
+                            }}
+                        >
+                            <IconTrash />
+                        </Button>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -1373,7 +1398,7 @@ function ExpensesSection({
                         <IconBanknotes /> Gastos & Liquidaciones
                     </span>
                 </h2>
-                {!showExpenseForm && (
+                {!showExpenseForm && !house.isReadOnly && (
                     <Button variant="primary" size="sm" onClick={onAddExpense}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><IconPlus /> Subir Gasto</span>
                     </Button>
@@ -1386,7 +1411,9 @@ function ExpensesSection({
                     {settlements.map((s, idx) => (
                         <div key={idx} style={{ backgroundColor: 'var(--accent-ultra-light)', border: '1px solid var(--accent-light)', padding: 'var(--space-3)', borderRadius: 'var(--radius-xl)', display: 'flex', justifyDouble: 'space-between', alignItems: 'center', justifyContent: 'space-between', fontSize: 'var(--text-xs)' }}>
                             <p style={{ margin: 0, color: 'var(--text-primary)' }}><span style={{ color: 'var(--success)' }}><IconBanknotes /></span> <strong>{s.debtorUsername}</strong> debe pagar <strong>{s.amount.toFixed(2)}€</strong> a <strong>{s.creditorUsername}</strong>.</p>
-                            <Button variant="primary" size="xs" onClick={() => onSettlePayment(s.debtorId, s.debtorUsername, s.creditorId, s.creditorUsername, s.amount)}>Registrar Pago</Button>
+                            {!house.isReadOnly && (
+                                <Button variant="primary" size="xs" onClick={() => onSettlePayment(s.debtorId, s.debtorUsername, s.creditorId, s.creditorUsername, s.amount)}>Registrar Pago</Button>
+                            )}
                         </div>
                     ))}
                 </div>
@@ -1731,7 +1758,7 @@ function CustomDialog({ title, message, type, onClose, onConfirm }) {
 /**
  * TaskDetailModal — Modal con detalles de una tarea
  */
-function TaskDetailModal({ task, onClose, onEdit, onDelete }) {
+function TaskDetailModal({ task, onClose, onEdit, onDelete, isReadOnly }) {
     return (
         <div
             style={{
@@ -1776,12 +1803,16 @@ function TaskDetailModal({ task, onClose, onEdit, onDelete }) {
                 </div>
 
                 <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 'var(--space-4)', display: 'flex', gap: 'var(--space-2)' }}>
-                    <Button variant="secondary" size="sm" onClick={onEdit} full>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}><IconPencil /> Editar</span>
-                    </Button>
-                    <Button variant="danger" size="sm" onClick={onDelete} full>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}><IconTrash /> Eliminar</span>
-                    </Button>
+                    {!isReadOnly && (
+                        <>
+                            <Button variant="secondary" size="sm" onClick={onEdit} full>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}><IconPencil /> Editar</span>
+                            </Button>
+                            <Button variant="danger" size="sm" onClick={onDelete} full>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}><IconTrash /> Eliminar</span>
+                            </Button>
+                        </>
+                    )}
                     <Button variant="primary" size="sm" onClick={onClose} full>
                         Cerrar
                     </Button>

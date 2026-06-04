@@ -130,6 +130,38 @@ public class HouseService {
                                 .inviteCode(house.getInviteCode())
                                 .profilePictureUrl(house.getProfilePictureUrl())
                                 .members(memberDtos)
+                                .isReadOnly(house.getDeletedAt() != null)
+                                .build();
+        }
+
+        @Transactional(readOnly = true)
+        public HouseDetailResponse getHouseDetail(UUID houseId, UUID userId) {
+                House house = houseRepository.findById(houseId)
+                                .orElseThrow(() -> new IllegalArgumentException("La casa no existe"));
+
+                HouseMember requester = houseMemberRepository.findByHouseIdAndUserId(houseId, userId)
+                                .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("No tienes permiso para ver esta casa"));
+
+                List<HouseMember> members = houseMemberRepository.findByHouseId(houseId);
+
+                List<HouseDetailResponse.HouseMemberResponse> memberDtos = members.stream()
+                                .filter(HouseMember::isActive)
+                                .map(m -> HouseDetailResponse.HouseMemberResponse.builder()
+                                                .userId(m.getUser().getId())
+                                                .username(m.getUser().getUsername())
+                                                .role(m.getRole().name())
+                                                .build())
+                                .collect(Collectors.toList());
+
+                boolean isReadOnly = !requester.isActive() || house.getDeletedAt() != null;
+
+                return HouseDetailResponse.builder()
+                                .id(house.getId())
+                                .name(house.getName())
+                                .inviteCode(house.getInviteCode())
+                                .profilePictureUrl(house.getProfilePictureUrl())
+                                .members(memberDtos)
+                                .isReadOnly(isReadOnly)
                                 .build();
         }
 
@@ -144,7 +176,7 @@ public class HouseService {
         @Transactional(readOnly = true)
         public List<UserHouseResponse> getDeletedUserHouses(UUID userId) {
                 return houseMemberRepository.findByUserId(userId).stream()
-                                .filter(m -> m.getHouse().getDeletedAt() != null)
+                                .filter(m -> m.getHouse().getDeletedAt() != null || !m.isActive())
                                 .map(m -> mapToUserHouseResponse(m.getHouse()))
                                 .collect(Collectors.toList());
         }
@@ -184,7 +216,7 @@ public class HouseService {
                                 house.getName());
                 activityLogService.log(msg, "UPDATE", house, actor);
 
-                return getHouseDetail(houseId);
+                return getHouseDetail(houseId, requestingUserId);
         }
 
         // MODIFICADO CON REGLA SOLID: Bloqueo estricto si el balance financiero no es

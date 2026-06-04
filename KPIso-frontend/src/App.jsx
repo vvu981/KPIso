@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useContext, useState, useEffect } from 'react';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { AuthContext } from './context/authContextValue.js';
@@ -7,15 +7,32 @@ import Dashboard from './pages/Dashboard';
 import HouseDetail from './pages/HouseDetail';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import api from './api/client';
+
+/**
+ * ProtectedRoute — Protege las rutas que requieren inicio de sesión
+ */
+function ProtectedRoute({ children }) {
+    const auth = useContext(AuthContext);
+    if (!auth?.token) {
+        return <Navigate to="/login" replace />;
+    }
+    return children;
+}
+
+/**
+ * PublicRoute — Redirige al Dashboard si el usuario ya está autenticado
+ */
+function PublicRoute({ children }) {
+    const auth = useContext(AuthContext);
+    if (auth?.token) {
+        return <Navigate to="/" replace />;
+    }
+    return children;
+}
 
 /**
  * AppContent — Contenedor principal con navegación y enrutamiento
- *
- * Gestiona:
- * - Estado de tema (dark/light)
- * - Navegación global
- * - Logout
- * - Enrutamiento entre páginas
  */
 function AppContent() {
     const auth = useContext(AuthContext);
@@ -23,6 +40,23 @@ function AppContent() {
         const saved = localStorage.getItem('kpiso-theme');
         return saved ? saved === 'dark' : false;
     });
+
+    // Interceptar errores 401 Unauthorized (JWT expirado o inválido)
+    useEffect(() => {
+        const interceptor = api.interceptors.response.use(
+            (response) => response,
+            (error) => {
+                if (error.response && error.response.status === 401) {
+                    auth?.logoutUser?.();
+                    window.location.href = '/login';
+                }
+                return Promise.reject(error);
+            }
+        );
+        return () => {
+            api.interceptors.response.eject(interceptor);
+        };
+    }, [auth]);
 
     // Aplicar tema al elemento root y persistir preferencia
     useEffect(() => {
@@ -71,10 +105,10 @@ function AppContent() {
                 }}
             >
                 <Routes>
-                    <Route path="/login" element={<Login isDark={isDark} onToggleTheme={handleToggleTheme} />} />
-                    <Route path="/register" element={<Register isDark={isDark} onToggleTheme={handleToggleTheme} />} />
-                    <Route path="/" element={<Dashboard />} />
-                    <Route path="/house/:houseId" element={<HouseDetail />} />
+                    <Route path="/login" element={<PublicRoute><Login isDark={isDark} onToggleTheme={handleToggleTheme} /></PublicRoute>} />
+                    <Route path="/register" element={<PublicRoute><Register isDark={isDark} onToggleTheme={handleToggleTheme} /></PublicRoute>} />
+                    <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                    <Route path="/house/:houseId" element={<ProtectedRoute><HouseDetail /></ProtectedRoute>} />
                 </Routes>
             </main>
         </div>
@@ -83,11 +117,6 @@ function AppContent() {
 
 /**
  * App — Componente raíz
- *
- * Proporciona:
- * - AuthProvider para contexto de autenticación
- * - Router para enrutamiento
- * - AppContent como contenedor principal
  */
 export default function App() {
     return (

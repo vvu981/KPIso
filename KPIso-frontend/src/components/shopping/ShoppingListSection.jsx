@@ -50,7 +50,7 @@ const IconChevronUp = () => (
  * - Listado de productos PENDING (sin comprar)
  * - Historial colapsable de productos BOUGHT (comprados e inmutables)
  */
-export default function ShoppingListSection({ houseId, currentUserId, onPurchaseRegistered }) {
+export default function ShoppingListSection({ houseId, currentUserId, onPurchaseRegistered, isReadOnly }) {
     const authContext = useContext(AuthContext);
     const { token } = authContext || {};
     const searchInputRef = useRef(null);
@@ -328,13 +328,20 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
         try {
             const [listRes, houseRes] = await Promise.all([
                 api.get(`/shopping-list/${houseId}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} }),
-                api.get(`/houses/${houseId}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+                api.get(`/houses/${houseId}?userId=${currentUserId}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
             ]);
             setShoppingList(listRes.data);
             setHouseMembers(houseRes.data.members || []);
+            if (houseRes.data.isReadOnly || isReadOnly) {
+                setError('Has sido expulsado de esta vivienda o ha sido eliminada.');
+            }
         } catch (err) {
             console.error('Error al cargar la lista de compra:', err);
-            setError('No se pudo cargar la lista de compra. Intenta de nuevo.');
+            if (err.response?.status === 403 || err.response?.status === 404) {
+                setError('Has sido expulsado de esta vivienda o ha sido eliminada.');
+            } else {
+                setError('No se pudo cargar la lista de compra. Intenta de nuevo.');
+            }
         } finally {
             setLoading(false);
         }
@@ -601,6 +608,16 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
         handleUpdateItemAssignees(item.id, newAssignees);
     };
 
+    if (isReadOnly || error === 'Has sido expulsado de esta vivienda o ha sido eliminada.') {
+        return (
+            <div className="space-y-6">
+                <Alert type="error" title="Acceso Restringido">
+                    Has sido expulsado de esta vivienda o ha sido eliminada.
+                </Alert>
+            </div>
+        );
+    }
+
     if (loading && shoppingList.pendingItems.length === 0) {
         return (
             <div className="flex items-center justify-center py-12">
@@ -631,265 +648,267 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                 </Alert>
             )}
 
-            {/* Formulario de Añadir Producto */}
-            <Card>
-                <div className="p-5 border-b border-gray-200">
-                    <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Añadir Producto</h3>
-                    {/* Selector de modo */}
-                    <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl mb-5 max-w-[320px] border border-gray-200/50 dark:border-gray-700/50">
-                        <button
-                            type="button"
-                            onClick={() => { setManualMode(false); setProductInput(''); }}
-                            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all ${
-                                !manualMode
-                                    ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-white shadow-sm'
-                                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-                            }`}
-                            style={{ border: 'none', cursor: 'pointer' }}
-                        >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                            </svg>
-                            Autocompletar
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => { setManualMode(true); setProductInput(''); setManualName(''); setManualPrice(''); }}
-                            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all ${
-                                manualMode
-                                    ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-white shadow-sm'
-                                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-                            }`}
-                            style={{ border: 'none', cursor: 'pointer' }}
-                        >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
-                            </svg>
-                            Modo Manual
-                        </button>
+            {!isReadOnly && (
+                /* Formulario de Añadir Producto */
+                <Card>
+                    <div className="p-5 border-b border-gray-200">
+                        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Añadir Producto</h3>
+                        {/* Selector de modo */}
+                        <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl mb-5 max-w-[320px] border border-gray-200/50 dark:border-gray-700/50">
+                            <button
+                                type="button"
+                                onClick={() => { setManualMode(false); setProductInput(''); }}
+                                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all ${
+                                    !manualMode
+                                        ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-white shadow-sm'
+                                        : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                                }`}
+                                style={{ border: 'none', cursor: 'pointer' }}
+                            >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                </svg>
+                                Autocompletar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => { setManualMode(true); setProductInput(''); setManualName(''); setManualPrice(''); }}
+                                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all ${
+                                    manualMode
+                                        ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-white shadow-sm'
+                                        : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                                }`}
+                                style={{ border: 'none', cursor: 'pointer' }}
+                            >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                                </svg>
+                                Modo Manual
+                            </button>
+                        </div>
+    
+                        {!manualMode ? (
+                            <form onSubmit={handleAddProduct} className="relative">
+                                <div className="flex gap-3">
+                                    <div className="flex-grow relative" ref={inputWrapperRef}>
+                                        <Input
+                                            ref={searchInputRef}
+                                            type="text"
+                                            placeholder="Ej: Leche, Pan integral, Tomates..."
+                                            value={productInput}
+                                            onChange={(e) => handleSearchProduct(e.target.value)}
+                                            onFocus={() => productInput.trim().length >= 2 && setSuggestions(suggestions.length > 0 ? suggestions : []) && setShowSuggestions(suggestions.length > 0)}
+                                            disabled={loading}
+                                            autoComplete="off"
+                                            style={{ paddingRight: '36px' }}
+                                        />
+    
+                                        {productInput && (
+                                            <button
+                                                type="button"
+                                                onClick={handleClearSearch}
+                                                style={{
+                                                    position: 'absolute',
+                                                    right: '12px',
+                                                    top: '50%',
+                                                    transform: 'translateY(-50%)',
+                                                    background: 'transparent',
+                                                    border: 'none',
+                                                    cursor: 'pointer',
+                                                    color: 'var(--text-secondary)',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    padding: '4px',
+                                                    borderRadius: '50%',
+                                                    transition: 'color 0.15s, background 0.15s',
+                                                }}
+                                                onMouseEnter={e => {
+                                                    e.currentTarget.style.color = 'var(--text-primary)';
+                                                    e.currentTarget.style.background = 'var(--bg-elevated)';
+                                                }}
+                                                onMouseLeave={e => {
+                                                    e.currentTarget.style.color = 'var(--text-secondary)';
+                                                    e.currentTarget.style.background = 'transparent';
+                                                }}
+                                                title="Limpiar búsqueda"
+                                            >
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                                </svg>
+                                            </button>
+                                        )}
+    
+                                        {/* Dropdown de Sugerencias — fixed para escapar del overflow:hidden de la Card */}
+                                        {showSuggestions && (
+                                            <div
+                                                style={{
+                                                    position: 'fixed',
+                                                    top: dropdownCoords.top,
+                                                    left: dropdownCoords.left,
+                                                    width: dropdownCoords.width,
+                                                    zIndex: 9999,
+                                                    background: 'var(--bg-surface)',
+                                                    border: '1px solid var(--border-default)',
+                                                    borderRadius: 'var(--radius-lg)',
+                                                    boxShadow: 'var(--shadow-lg)',
+                                                    maxHeight: '22rem',
+                                                    overflowY: 'auto',
+                                                }}
+                                            >
+                                                {suggestions.length > 0 ? (
+                                                    suggestions.map((suggestion, idx) => (
+                                                        <button
+                                                            key={idx}
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                handleSuggestionClick(suggestion);
+                                                            }}
+                                                            style={{
+                                                                width: '100%',
+                                                                textAlign: 'left',
+                                                                padding: '10px 14px',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: '12px',
+                                                                background: 'transparent',
+                                                                border: 'none',
+                                                                borderBottom: '1px solid var(--border-subtle)',
+                                                                cursor: 'pointer',
+                                                                transition: 'background 0.15s',
+                                                                color: 'var(--text-primary)',
+                                                            }}
+                                                            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-elevated)'}
+                                                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                                        >
+                                                            <img
+                                                                src={suggestion.imageUrl}
+                                                                alt={suggestion.name}
+                                                                style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 'var(--radius-md)', background: 'var(--bg-elevated)', flexShrink: 0 }}
+                                                                onError={(e) => { e.target.src = 'https://via.placeholder.com/40?text=?'; }}
+                                                            />
+                                                            <div style={{ flexGrow: 1, minWidth: 0 }}>
+                                                                <p style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>
+                                                                    {suggestion.name}
+                                                                </p>
+                                                                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', margin: 0 }}>
+                                                                    Est. {suggestion.estimatedPrice.toFixed(2)}€
+                                                                </p>
+                                                            </div>
+                                                        </button>
+                                                    ))
+                                                ) : (
+                                                    <div style={{ padding: '16px', textAlign: 'center' }}>
+                                                        {externalSearchError ? (
+                                                            <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: '#ef4444', fontWeight: 500 }}>
+                                                                ⚠️ {externalSearchError}
+                                                            </p>
+                                                        ) : !hasSearchedExternal ? (
+                                                            <>
+                                                                <p style={{ margin: '0 0 12px 0', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
+                                                                    No se ha encontrado el producto en el catálogo local.
+                                                                </p>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={handleSearchExternal}
+                                                                    style={{
+                                                                        background: 'var(--brand-primary, #4f46e5)',
+                                                                        color: 'white',
+                                                                        border: 'none',
+                                                                        padding: '8px 14px',
+                                                                        borderRadius: 'var(--radius-md, 6px)',
+                                                                        cursor: 'pointer',
+                                                                        fontSize: 'var(--text-xs)',
+                                                                        fontWeight: 'bold',
+                                                                        transition: 'opacity 0.2s'
+                                                                    }}
+                                                                    onMouseEnter={e => e.currentTarget.style.opacity = '0.9'}
+                                                                    onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                                                                >
+                                                                    Buscar en Open Food Facts
+                                                                </button>
+                                                            </>
+                                                        ) : (
+                                                            <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
+                                                                No se encontraron resultados en la API externa tampoco.
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+    
+                                        {searchLoading && productInput.trim().length >= 2 && (
+                                            <div
+                                                style={{
+                                                    position: 'fixed',
+                                                    top: dropdownCoords.top,
+                                                    left: dropdownCoords.left,
+                                                    width: dropdownCoords.width,
+                                                    zIndex: 9999,
+                                                    background: 'var(--bg-surface)',
+                                                    border: '1px solid var(--border-default)',
+                                                    borderRadius: 'var(--radius-lg)',
+                                                    boxShadow: 'var(--shadow-lg)',
+                                                    padding: '12px 16px',
+                                                    textAlign: 'center',
+                                                    fontSize: 'var(--text-sm)',
+                                                    color: 'var(--text-secondary)',
+                                                }}
+                                            >
+                                                Buscando...
+                                            </div>
+                                        )}
+                                    </div>
+                                    <Button
+                                        type="submit"
+                                        disabled={loading || !productInput.trim()}
+                                        className="flex items-center gap-2 whitespace-nowrap"
+                                    >
+                                        <IconPlus />
+                                        Añadir
+                                    </Button>
+                                </div>
+                            </form>
+                        ) : (
+                            <form onSubmit={handleAddProduct}>
+                                <div className="flex gap-3">
+                                    <div className="flex-grow">
+                                        <Input
+                                            type="text"
+                                            placeholder="Nombre del producto manual"
+                                            value={manualName}
+                                            onChange={(e) => { setManualName(e.target.value); setProductInput(e.target.value); }}
+                                            disabled={loading}
+                                        />
+                                    </div>
+                                    <div style={{ width: '180px' }}>
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            placeholder="Precio (€) opcional"
+                                            value={manualPrice}
+                                            onChange={(e) => setManualPrice(e.target.value)}
+                                            disabled={loading}
+                                        />
+                                    </div>
+                                    <Button
+                                        type="submit"
+                                        disabled={loading || !manualName.trim()}
+                                        className="flex items-center gap-2 whitespace-nowrap"
+                                    >
+                                        <IconPlus />
+                                        Añadir Manual
+                                    </Button>
+                                </div>
+                            </form>
+                        )}
                     </div>
-
-                    {!manualMode ? (
-                        <form onSubmit={handleAddProduct} className="relative">
-                            <div className="flex gap-3">
-                                <div className="flex-grow relative" ref={inputWrapperRef}>
-                                    <Input
-                                        ref={searchInputRef}
-                                        type="text"
-                                        placeholder="Ej: Leche, Pan integral, Tomates..."
-                                        value={productInput}
-                                        onChange={(e) => handleSearchProduct(e.target.value)}
-                                        onFocus={() => productInput.trim().length >= 2 && setSuggestions(suggestions.length > 0 ? suggestions : []) && setShowSuggestions(suggestions.length > 0)}
-                                        disabled={loading}
-                                        autoComplete="off"
-                                        style={{ paddingRight: '36px' }}
-                                    />
-
-                                    {productInput && (
-                                        <button
-                                            type="button"
-                                            onClick={handleClearSearch}
-                                            style={{
-                                                position: 'absolute',
-                                                right: '12px',
-                                                top: '50%',
-                                                transform: 'translateY(-50%)',
-                                                background: 'transparent',
-                                                border: 'none',
-                                                cursor: 'pointer',
-                                                color: 'var(--text-secondary)',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                padding: '4px',
-                                                borderRadius: '50%',
-                                                transition: 'color 0.15s, background 0.15s',
-                                            }}
-                                            onMouseEnter={e => {
-                                                e.currentTarget.style.color = 'var(--text-primary)';
-                                                e.currentTarget.style.background = 'var(--bg-elevated)';
-                                            }}
-                                            onMouseLeave={e => {
-                                                e.currentTarget.style.color = 'var(--text-secondary)';
-                                                e.currentTarget.style.background = 'transparent';
-                                            }}
-                                            title="Limpiar búsqueda"
-                                        >
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                <line x1="18" y1="6" x2="6" y2="18"></line>
-                                                <line x1="6" y1="6" x2="18" y2="18"></line>
-                                            </svg>
-                                        </button>
-                                    )}
-
-                                    {/* Dropdown de Sugerencias — fixed para escapar del overflow:hidden de la Card */}
-                                    {showSuggestions && (
-                                        <div
-                                            style={{
-                                                position: 'fixed',
-                                                top: dropdownCoords.top,
-                                                left: dropdownCoords.left,
-                                                width: dropdownCoords.width,
-                                                zIndex: 9999,
-                                                background: 'var(--bg-surface)',
-                                                border: '1px solid var(--border-default)',
-                                                borderRadius: 'var(--radius-lg)',
-                                                boxShadow: 'var(--shadow-lg)',
-                                                maxHeight: '22rem',
-                                                overflowY: 'auto',
-                                            }}
-                                        >
-                                            {suggestions.length > 0 ? (
-                                                suggestions.map((suggestion, idx) => (
-                                                    <button
-                                                        key={idx}
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.preventDefault();
-                                                            handleSuggestionClick(suggestion);
-                                                        }}
-                                                        style={{
-                                                            width: '100%',
-                                                            textAlign: 'left',
-                                                            padding: '10px 14px',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            gap: '12px',
-                                                            background: 'transparent',
-                                                            border: 'none',
-                                                            borderBottom: '1px solid var(--border-subtle)',
-                                                            cursor: 'pointer',
-                                                            transition: 'background 0.15s',
-                                                            color: 'var(--text-primary)',
-                                                        }}
-                                                        onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-elevated)'}
-                                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                                                    >
-                                                        <img
-                                                            src={suggestion.imageUrl}
-                                                            alt={suggestion.name}
-                                                            style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 'var(--radius-md)', background: 'var(--bg-elevated)', flexShrink: 0 }}
-                                                            onError={(e) => { e.target.src = 'https://via.placeholder.com/40?text=?'; }}
-                                                        />
-                                                        <div style={{ flexGrow: 1, minWidth: 0 }}>
-                                                            <p style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>
-                                                                {suggestion.name}
-                                                            </p>
-                                                            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', margin: 0 }}>
-                                                                Est. {suggestion.estimatedPrice.toFixed(2)}€
-                                                            </p>
-                                                        </div>
-                                                    </button>
-                                                ))
-                                            ) : (
-                                                <div style={{ padding: '16px', textAlign: 'center' }}>
-                                                    {externalSearchError ? (
-                                                        <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: '#ef4444', fontWeight: 500 }}>
-                                                            ⚠️ {externalSearchError}
-                                                        </p>
-                                                    ) : !hasSearchedExternal ? (
-                                                        <>
-                                                            <p style={{ margin: '0 0 12px 0', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
-                                                                No se ha encontrado el producto en el catálogo local.
-                                                            </p>
-                                                            <button
-                                                                type="button"
-                                                                onClick={handleSearchExternal}
-                                                                style={{
-                                                                    background: 'var(--brand-primary, #4f46e5)',
-                                                                    color: 'white',
-                                                                    border: 'none',
-                                                                    padding: '8px 14px',
-                                                                    borderRadius: 'var(--radius-md, 6px)',
-                                                                    cursor: 'pointer',
-                                                                    fontSize: 'var(--text-xs)',
-                                                                    fontWeight: 'bold',
-                                                                    transition: 'opacity 0.2s'
-                                                                }}
-                                                                onMouseEnter={e => e.currentTarget.style.opacity = '0.9'}
-                                                                onMouseLeave={e => e.currentTarget.style.opacity = '1'}
-                                                            >
-                                                                Buscar en Open Food Facts
-                                                            </button>
-                                                        </>
-                                                    ) : (
-                                                        <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
-                                                            No se encontraron resultados en la API externa tampoco.
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {searchLoading && productInput.trim().length >= 2 && (
-                                        <div
-                                            style={{
-                                                position: 'fixed',
-                                                top: dropdownCoords.top,
-                                                left: dropdownCoords.left,
-                                                width: dropdownCoords.width,
-                                                zIndex: 9999,
-                                                background: 'var(--bg-surface)',
-                                                border: '1px solid var(--border-default)',
-                                                borderRadius: 'var(--radius-lg)',
-                                                boxShadow: 'var(--shadow-lg)',
-                                                padding: '12px 16px',
-                                                textAlign: 'center',
-                                                fontSize: 'var(--text-sm)',
-                                                color: 'var(--text-secondary)',
-                                            }}
-                                        >
-                                            Buscando...
-                                        </div>
-                                    )}
-                                </div>
-                                <Button
-                                    type="submit"
-                                    disabled={loading || !productInput.trim()}
-                                    className="flex items-center gap-2 whitespace-nowrap"
-                                >
-                                    <IconPlus />
-                                    Añadir
-                                </Button>
-                            </div>
-                        </form>
-                    ) : (
-                        <form onSubmit={handleAddProduct}>
-                            <div className="flex gap-3">
-                                <div className="flex-grow">
-                                    <Input
-                                        type="text"
-                                        placeholder="Nombre del producto manual"
-                                        value={manualName}
-                                        onChange={(e) => { setManualName(e.target.value); setProductInput(e.target.value); }}
-                                        disabled={loading}
-                                    />
-                                </div>
-                                <div style={{ width: '180px' }}>
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        placeholder="Precio (€) opcional"
-                                        value={manualPrice}
-                                        onChange={(e) => setManualPrice(e.target.value)}
-                                        disabled={loading}
-                                    />
-                                </div>
-                                <Button
-                                    type="submit"
-                                    disabled={loading || !manualName.trim()}
-                                    className="flex items-center gap-2 whitespace-nowrap"
-                                >
-                                    <IconPlus />
-                                    Añadir Manual
-                                </Button>
-                            </div>
-                        </form>
-                    )}
-                </div>
-            </Card>
+                </Card>
+            )}
 
 
 
@@ -976,17 +995,21 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                                                     <div className="relative flex items-center gap-1.5">
                                                         <span className="text-xs text-gray-500 font-medium">Para:</span>
                                                         <div className="relative group-assign-dropdown-container">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    setOpenGroupDropdown(isGroupDropOpen ? null : group.key);
-                                                                    setOpenDropdownId(null);
-                                                                }}
-                                                                className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 focus:outline-none transition-colors"
-                                                            >
-                                                                <span className="truncate max-w-[120px]">{assignLabel}</span>
-                                                                <IconChevronDown />
-                                                            </button>
+                                                            {isReadOnly ? (
+                                                                <span className="text-xs font-medium text-gray-700">{assignLabel}</span>
+                                                            ) : (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setOpenGroupDropdown(isGroupDropOpen ? null : group.key);
+                                                                        setOpenDropdownId(null);
+                                                                    }}
+                                                                    className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 focus:outline-none transition-colors"
+                                                                >
+                                                                    <span className="truncate max-w-[120px]">{assignLabel}</span>
+                                                                    <IconChevronDown />
+                                                                </button>
+                                                            )}
 
                                                             {isGroupDropOpen && (
                                                                 <>
@@ -1086,7 +1109,7 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                                             {/* Acciones del grupo */}
                                             <div className="flex-shrink-0 flex items-center gap-2">
                                                 {/* Botón eliminar — solo si qty=1 */}
-                                                {qty === 1 && (
+                                                {qty === 1 && !isReadOnly && (
                                                     <Button
                                                         variant="danger"
                                                         size="sm"
@@ -1143,14 +1166,18 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
 
                                                         {/* Asignación individual */}
                                                         <div className="relative assignee-dropdown-container">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setOpenDropdownId(openDropdownId === item.id ? null : item.id)}
-                                                                className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium border bg-white border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
-                                                            >
-                                                                <span>{getAssigneesLabel(item.assignedUserIds)}</span>
-                                                                <IconChevronDown />
-                                                            </button>
+                                                            {isReadOnly ? (
+                                                                <span className="text-xs font-medium text-gray-700">{getAssigneesLabel(item.assignedUserIds)}</span>
+                                                            ) : (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setOpenDropdownId(openDropdownId === item.id ? null : item.id)}
+                                                                    className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium border bg-white border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+                                                                >
+                                                                    <span>{getAssigneesLabel(item.assignedUserIds)}</span>
+                                                                    <IconChevronDown />
+                                                                </button>
+                                                            )}
                                                             {openDropdownId === item.id && (
                                                                 <>
                                                                     <div
@@ -1187,20 +1214,22 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                                                         </div>
 
                                                         {/* Eliminar unidad individual */}
-                                                        <button
-                                                            type="button"
-                                                            title="Eliminar esta unidad"
-                                                            onClick={() => handleDeleteItem(item.id, item.name, true)}
-                                                            disabled={loadingItemId === item.id}
-                                                            style={{
-                                                                background: 'none', border: 'none', cursor: 'pointer',
-                                                                color: 'var(--color-danger, #ef4444)', padding: '4px',
-                                                                borderRadius: 'var(--radius-sm)', display: 'flex',
-                                                                transition: 'opacity 0.15s',
-                                                            }}
-                                                        >
-                                                            <IconTrash />
-                                                        </button>
+                                                        {!isReadOnly && (
+                                                            <button
+                                                                type="button"
+                                                                title="Eliminar esta unidad"
+                                                                onClick={() => handleDeleteItem(item.id, item.name, true)}
+                                                                disabled={loadingItemId === item.id}
+                                                                style={{
+                                                                    background: 'none', border: 'none', cursor: 'pointer',
+                                                                    color: 'var(--color-danger, #ef4444)', padding: '4px',
+                                                                    borderRadius: 'var(--radius-sm)', display: 'flex',
+                                                                    transition: 'opacity 0.15s',
+                                                                }}
+                                                            >
+                                                                <IconTrash />
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 ))}
                                             </div>
@@ -1223,13 +1252,15 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                                     ({shoppingList.pendingItems.length} {shoppingList.pendingItems.length === 1 ? 'producto' : 'productos'})
                                 </span>
                             </div>
-                            <Button
-                                variant="primary"
-                                onClick={() => setShowCheckout(true)}
-                                className="w-full sm:w-auto px-6 py-2.5 text-sm font-semibold shadow-sm hover:shadow transition-all"
-                            >
-                                Pagar compra
-                            </Button>
+                            {!isReadOnly && (
+                                <Button
+                                    variant="primary"
+                                    onClick={() => setShowCheckout(true)}
+                                    className="w-full sm:w-auto px-6 py-2.5 text-sm font-semibold shadow-sm hover:shadow transition-all"
+                                >
+                                    Pagar compra
+                                </Button>
+                            )}
                         </div>
                     </Card>
                 );
@@ -1599,11 +1630,13 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
             )}
 
             {/* Chatbox Asistente IA */}
-            <AIChatbox 
-                houseId={houseId} 
-                currentUserId={currentUserId} 
-                loadShoppingList={loadShoppingList} 
-            />
+            {!isReadOnly && (
+                <AIChatbox 
+                    houseId={houseId} 
+                    currentUserId={currentUserId} 
+                    loadShoppingList={loadShoppingList} 
+                />
+            )}
         </div>
     );
 }

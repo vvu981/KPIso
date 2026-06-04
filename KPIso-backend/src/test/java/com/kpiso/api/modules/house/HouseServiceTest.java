@@ -167,23 +167,33 @@ class HouseServiceTest {
         HouseMember guestMember = TestFixtures.houseMember(house, guest, HouseRole.MEMBER, "#10b981");
 
         when(houseRepository.findById(house.getId())).thenReturn(Optional.of(house));
+        when(houseMemberRepository.findByHouseIdAndUserId(house.getId(), creator.getId())).thenReturn(Optional.of(adminMember));
         when(houseMemberRepository.findByHouseId(house.getId())).thenReturn(List.of(adminMember, guestMember));
 
-        HouseDetailResponse response = houseService.getHouseDetail(house.getId());
+        HouseDetailResponse response = houseService.getHouseDetail(house.getId(), creator.getId());
 
         assertEquals(house.getId(), response.getId());
         assertEquals("Mi Piso", response.getName());
         assertEquals(2, response.getMembers().size());
         assertEquals(creator.getUsername(), response.getMembers().get(0).getUsername());
+        assertFalse(response.getIsReadOnly());
     }
 
     @Test
     void getHouseDetailShouldFailWhenHouseDoesNotExist() {
         when(houseRepository.findById(house.getId())).thenReturn(Optional.empty());
 
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> houseService.getHouseDetail(house.getId()));
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> houseService.getHouseDetail(house.getId(), creator.getId()));
 
         assertEquals("La casa no existe", exception.getMessage());
+    }
+
+    @Test
+    void getHouseDetailShouldFailWhenUserIsNotParticipant() {
+        when(houseRepository.findById(house.getId())).thenReturn(Optional.of(house));
+        when(houseMemberRepository.findByHouseIdAndUserId(house.getId(), guest.getId())).thenReturn(Optional.empty());
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> houseService.getHouseDetail(house.getId(), guest.getId()));
     }
 
     @Test

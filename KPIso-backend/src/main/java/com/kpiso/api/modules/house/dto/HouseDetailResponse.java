@@ -15,6 +15,7 @@ public class HouseDetailResponse {
     private String inviteCode;
     private String profilePictureUrl;
     private List<HouseMemberResponse> members;
+    private Boolean isReadOnly;
 
     @Getter
     @Setter
