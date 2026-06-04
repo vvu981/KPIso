@@ -16,4 +16,5 @@ public class AddShoppingItemRequest {
     private List<UUID> assignedUserIds;
     // Nuevo: permitir sobreescritura manual
     private Double manualPrice;
+    private Boolean isManual;
 }

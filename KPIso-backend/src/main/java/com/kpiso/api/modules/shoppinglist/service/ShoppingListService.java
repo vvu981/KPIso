@@ -108,11 +108,13 @@ public class ShoppingListService {
         // Aislar la llamada externa. Si la API falla, no impedimos que el usuario añada
         // el producto manualmente.
         ProductDetails productDetails = null;
-        try {
-            productDetails = productCatalogClient.searchProduct(request.getProductName());
-        } catch (Exception e) {
-            log.warn("El catálogo externo falló al buscar '{}'. Se registrará como entrada manual. Error: {}",
-                    request.getProductName(), e.getMessage());
+        if (!Boolean.TRUE.equals(request.getIsManual())) {
+            try {
+                productDetails = productCatalogClient.searchProduct(request.getProductName());
+            } catch (Exception e) {
+                log.warn("El catálogo externo falló al buscar '{}'. Se registrará como entrada manual. Error: {}",
+                        request.getProductName(), e.getMessage());
+            }
         }
 
         String productName = request.getProductName();

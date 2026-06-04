@@ -437,7 +437,8 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                 productName: productName,
                 houseId: houseId,
                 addedById: currentUserId,
-                assignedUserIds: []
+                assignedUserIds: [],
+                isManual: manualMode
             };
             if (manualMode && manualPrice && !isNaN(parseFloat(manualPrice))) {
                 payload.manualPrice = parseFloat(manualPrice);
@@ -634,220 +635,248 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
             <Card>
                 <div className="p-5 border-b border-gray-200">
                     <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Añadir Producto</h3>
-                    <form onSubmit={handleAddProduct} className="relative">
-                        <div className="flex gap-3">
-                            <div className="flex-grow relative" ref={inputWrapperRef}>
-                                <Input
-                                    ref={searchInputRef}
-                                    type="text"
-                                    placeholder="Ej: Leche, Pan integral, Tomates..."
-                                    value={productInput}
-                                    onChange={(e) => handleSearchProduct(e.target.value)}
-                                    onFocus={() => productInput.trim().length >= 2 && setSuggestions(suggestions.length > 0 ? suggestions : []) && setShowSuggestions(suggestions.length > 0)}
-                                    disabled={loading}
-                                    autoComplete="off"
-                                    style={{ paddingRight: '36px' }}
-                                />
+                    {/* Selector de modo */}
+                    <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl mb-5 max-w-[320px] border border-gray-200/50 dark:border-gray-700/50">
+                        <button
+                            type="button"
+                            onClick={() => { setManualMode(false); setProductInput(''); }}
+                            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all ${
+                                !manualMode
+                                    ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-white shadow-sm'
+                                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                            }`}
+                            style={{ border: 'none', cursor: 'pointer' }}
+                        >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                            Autocompletar
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => { setManualMode(true); setProductInput(''); setManualName(''); setManualPrice(''); }}
+                            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all ${
+                                manualMode
+                                    ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-white shadow-sm'
+                                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                            }`}
+                            style={{ border: 'none', cursor: 'pointer' }}
+                        >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                            </svg>
+                            Modo Manual
+                        </button>
+                    </div>
 
-                                {productInput && (
-                                    <button
-                                        type="button"
-                                        onClick={handleClearSearch}
-                                        style={{
-                                            position: 'absolute',
-                                            right: '12px',
-                                            top: '50%',
-                                            transform: 'translateY(-50%)',
-                                            background: 'transparent',
-                                            border: 'none',
-                                            cursor: 'pointer',
-                                            color: 'var(--text-secondary)',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            padding: '4px',
-                                            borderRadius: '50%',
-                                            transition: 'color 0.15s, background 0.15s',
-                                        }}
-                                        onMouseEnter={e => {
-                                            e.currentTarget.style.color = 'var(--text-primary)';
-                                            e.currentTarget.style.background = 'var(--bg-elevated)';
-                                        }}
-                                        onMouseLeave={e => {
-                                            e.currentTarget.style.color = 'var(--text-secondary)';
-                                            e.currentTarget.style.background = 'transparent';
-                                        }}
-                                        title="Limpiar búsqueda"
-                                    >
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                                            <line x1="6" y1="6" x2="18" y2="18"></line>
-                                        </svg>
-                                    </button>
-                                )}
-
-                                {/* Dropdown de Sugerencias — fixed para escapar del overflow:hidden de la Card */}
-                                {showSuggestions && (
-                                    <div
-                                        style={{
-                                            position: 'fixed',
-                                            top: dropdownCoords.top,
-                                            left: dropdownCoords.left,
-                                            width: dropdownCoords.width,
-                                            zIndex: 9999,
-                                            background: 'var(--bg-surface)',
-                                            border: '1px solid var(--border-default)',
-                                            borderRadius: 'var(--radius-lg)',
-                                            boxShadow: 'var(--shadow-lg)',
-                                            maxHeight: '22rem',
-                                            overflowY: 'auto',
-                                        }}
-                                    >
-                                        {suggestions.length > 0 ? (
-                                            suggestions.map((suggestion, idx) => (
-                                                <button
-                                                    key={idx}
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        handleSuggestionClick(suggestion);
-                                                    }}
-                                                    style={{
-                                                        width: '100%',
-                                                        textAlign: 'left',
-                                                        padding: '10px 14px',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: '12px',
-                                                        background: 'transparent',
-                                                        border: 'none',
-                                                        borderBottom: '1px solid var(--border-subtle)',
-                                                        cursor: 'pointer',
-                                                        transition: 'background 0.15s',
-                                                        color: 'var(--text-primary)',
-                                                    }}
-                                                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-elevated)'}
-                                                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                                                >
-                                                    <img
-                                                        src={suggestion.imageUrl}
-                                                        alt={suggestion.name}
-                                                        style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 'var(--radius-md)', background: 'var(--bg-elevated)', flexShrink: 0 }}
-                                                        onError={(e) => { e.target.src = 'https://via.placeholder.com/40?text=?'; }}
-                                                    />
-                                                    <div style={{ flexGrow: 1, minWidth: 0 }}>
-                                                        <p style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>
-                                                            {suggestion.name}
-                                                        </p>
-                                                        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', margin: 0 }}>
-                                                            Est. {suggestion.estimatedPrice.toFixed(2)}€
-                                                        </p>
-                                                    </div>
-                                                </button>
-                                            ))
-                                        ) : (
-                                            <div style={{ padding: '16px', textAlign: 'center' }}>
-                                                {externalSearchError ? (
-                                                    <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: '#ef4444', fontWeight: 500 }}>
-                                                        ⚠️ {externalSearchError}
-                                                    </p>
-                                                ) : !hasSearchedExternal ? (
-                                                    <>
-                                                        <p style={{ margin: '0 0 12px 0', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
-                                                            No se ha encontrado el producto en el catálogo local.
-                                                        </p>
-                                                        <button
-                                                            type="button"
-                                                            onClick={handleSearchExternal}
-                                                            style={{
-                                                                background: 'var(--brand-primary, #4f46e5)',
-                                                                color: 'white',
-                                                                border: 'none',
-                                                                padding: '8px 14px',
-                                                                borderRadius: 'var(--radius-md, 6px)',
-                                                                cursor: 'pointer',
-                                                                fontSize: 'var(--text-xs)',
-                                                                fontWeight: 'bold',
-                                                                transition: 'opacity 0.2s'
-                                                            }}
-                                                            onMouseEnter={e => e.currentTarget.style.opacity = '0.9'}
-                                                            onMouseLeave={e => e.currentTarget.style.opacity = '1'}
-                                                        >
-                                                            Buscar en Open Food Facts
-                                                        </button>
-                                                    </>
-                                                ) : (
-                                                    <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
-                                                        No se encontraron resultados en la API externa tampoco.
-                                                    </p>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-
-                                {searchLoading && productInput.trim().length >= 2 && (
-                                    <div
-                                        style={{
-                                            position: 'fixed',
-                                            top: dropdownCoords.top,
-                                            left: dropdownCoords.left,
-                                            width: dropdownCoords.width,
-                                            zIndex: 9999,
-                                            background: 'var(--bg-surface)',
-                                            border: '1px solid var(--border-default)',
-                                            borderRadius: 'var(--radius-lg)',
-                                            boxShadow: 'var(--shadow-lg)',
-                                            padding: '12px 16px',
-                                            textAlign: 'center',
-                                            fontSize: 'var(--text-sm)',
-                                            color: 'var(--text-secondary)',
-                                        }}
-                                    >
-                                        Buscando...
-                                    </div>
-                                )}
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setManualMode(!manualMode)}
-                                    className={`px-3 py-1.5 rounded-md border text-sm font-medium ${manualMode ? 'bg-gray-100' : 'bg-white'}`}
-                                >
-                                    {manualMode ? 'Modo Manual' : 'Autocompletar'}
-                                </button>
-                                <Button
-                                type="submit"
-                                disabled={loading || !productInput.trim()}
-                                className="flex items-center gap-2 whitespace-nowrap"
-                            >
-                                <IconPlus />
-                                Añadir
-                            </Button>
-                            </div>
-                        </div>
-                    </form>
-
-                    {/* Formulario Manual Extra */}
-                    {manualMode && (
-                        <form onSubmit={handleAddProduct} className="mt-3">
+                    {!manualMode ? (
+                        <form onSubmit={handleAddProduct} className="relative">
                             <div className="flex gap-3">
-                                <Input
-                                    type="text"
-                                    placeholder="Nombre del producto"
-                                    value={manualName}
-                                    onChange={(e) => { setManualName(e.target.value); setProductInput(e.target.value); }}
-                                    disabled={loading}
-                                />
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    placeholder="Precio (€) opcional"
-                                    value={manualPrice}
-                                    onChange={(e) => setManualPrice(e.target.value)}
-                                    disabled={loading}
-                                />
+                                <div className="flex-grow relative" ref={inputWrapperRef}>
+                                    <Input
+                                        ref={searchInputRef}
+                                        type="text"
+                                        placeholder="Ej: Leche, Pan integral, Tomates..."
+                                        value={productInput}
+                                        onChange={(e) => handleSearchProduct(e.target.value)}
+                                        onFocus={() => productInput.trim().length >= 2 && setSuggestions(suggestions.length > 0 ? suggestions : []) && setShowSuggestions(suggestions.length > 0)}
+                                        disabled={loading}
+                                        autoComplete="off"
+                                        style={{ paddingRight: '36px' }}
+                                    />
+
+                                    {productInput && (
+                                        <button
+                                            type="button"
+                                            onClick={handleClearSearch}
+                                            style={{
+                                                position: 'absolute',
+                                                right: '12px',
+                                                top: '50%',
+                                                transform: 'translateY(-50%)',
+                                                background: 'transparent',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                color: 'var(--text-secondary)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                padding: '4px',
+                                                borderRadius: '50%',
+                                                transition: 'color 0.15s, background 0.15s',
+                                            }}
+                                            onMouseEnter={e => {
+                                                e.currentTarget.style.color = 'var(--text-primary)';
+                                                e.currentTarget.style.background = 'var(--bg-elevated)';
+                                            }}
+                                            onMouseLeave={e => {
+                                                e.currentTarget.style.color = 'var(--text-secondary)';
+                                                e.currentTarget.style.background = 'transparent';
+                                            }}
+                                            title="Limpiar búsqueda"
+                                        >
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                                            </svg>
+                                        </button>
+                                    )}
+
+                                    {/* Dropdown de Sugerencias — fixed para escapar del overflow:hidden de la Card */}
+                                    {showSuggestions && (
+                                        <div
+                                            style={{
+                                                position: 'fixed',
+                                                top: dropdownCoords.top,
+                                                left: dropdownCoords.left,
+                                                width: dropdownCoords.width,
+                                                zIndex: 9999,
+                                                background: 'var(--bg-surface)',
+                                                border: '1px solid var(--border-default)',
+                                                borderRadius: 'var(--radius-lg)',
+                                                boxShadow: 'var(--shadow-lg)',
+                                                maxHeight: '22rem',
+                                                overflowY: 'auto',
+                                            }}
+                                        >
+                                            {suggestions.length > 0 ? (
+                                                suggestions.map((suggestion, idx) => (
+                                                    <button
+                                                        key={idx}
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            handleSuggestionClick(suggestion);
+                                                        }}
+                                                        style={{
+                                                            width: '100%',
+                                                            textAlign: 'left',
+                                                            padding: '10px 14px',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '12px',
+                                                            background: 'transparent',
+                                                            border: 'none',
+                                                            borderBottom: '1px solid var(--border-subtle)',
+                                                            cursor: 'pointer',
+                                                            transition: 'background 0.15s',
+                                                            color: 'var(--text-primary)',
+                                                        }}
+                                                        onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-elevated)'}
+                                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                                    >
+                                                        <img
+                                                            src={suggestion.imageUrl}
+                                                            alt={suggestion.name}
+                                                            style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 'var(--radius-md)', background: 'var(--bg-elevated)', flexShrink: 0 }}
+                                                            onError={(e) => { e.target.src = 'https://via.placeholder.com/40?text=?'; }}
+                                                        />
+                                                        <div style={{ flexGrow: 1, minWidth: 0 }}>
+                                                            <p style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>
+                                                                {suggestion.name}
+                                                            </p>
+                                                            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', margin: 0 }}>
+                                                                Est. {suggestion.estimatedPrice.toFixed(2)}€
+                                                            </p>
+                                                        </div>
+                                                    </button>
+                                                ))
+                                            ) : (
+                                                <div style={{ padding: '16px', textAlign: 'center' }}>
+                                                    {externalSearchError ? (
+                                                        <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: '#ef4444', fontWeight: 500 }}>
+                                                            ⚠️ {externalSearchError}
+                                                        </p>
+                                                    ) : !hasSearchedExternal ? (
+                                                        <>
+                                                            <p style={{ margin: '0 0 12px 0', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
+                                                                No se ha encontrado el producto en el catálogo local.
+                                                            </p>
+                                                            <button
+                                                                type="button"
+                                                                onClick={handleSearchExternal}
+                                                                style={{
+                                                                    background: 'var(--brand-primary, #4f46e5)',
+                                                                    color: 'white',
+                                                                    border: 'none',
+                                                                    padding: '8px 14px',
+                                                                    borderRadius: 'var(--radius-md, 6px)',
+                                                                    cursor: 'pointer',
+                                                                    fontSize: 'var(--text-xs)',
+                                                                    fontWeight: 'bold',
+                                                                    transition: 'opacity 0.2s'
+                                                                }}
+                                                                onMouseEnter={e => e.currentTarget.style.opacity = '0.9'}
+                                                                onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                                                            >
+                                                                Buscar en Open Food Facts
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
+                                                            No se encontraron resultados en la API externa tampoco.
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {searchLoading && productInput.trim().length >= 2 && (
+                                        <div
+                                            style={{
+                                                position: 'fixed',
+                                                top: dropdownCoords.top,
+                                                left: dropdownCoords.left,
+                                                width: dropdownCoords.width,
+                                                zIndex: 9999,
+                                                background: 'var(--bg-surface)',
+                                                border: '1px solid var(--border-default)',
+                                                borderRadius: 'var(--radius-lg)',
+                                                boxShadow: 'var(--shadow-lg)',
+                                                padding: '12px 16px',
+                                                textAlign: 'center',
+                                                fontSize: 'var(--text-sm)',
+                                                color: 'var(--text-secondary)',
+                                            }}
+                                        >
+                                            Buscando...
+                                        </div>
+                                    )}
+                                </div>
+                                <Button
+                                    type="submit"
+                                    disabled={loading || !productInput.trim()}
+                                    className="flex items-center gap-2 whitespace-nowrap"
+                                >
+                                    <IconPlus />
+                                    Añadir
+                                </Button>
+                            </div>
+                        </form>
+                    ) : (
+                        <form onSubmit={handleAddProduct}>
+                            <div className="flex gap-3">
+                                <div className="flex-grow">
+                                    <Input
+                                        type="text"
+                                        placeholder="Nombre del producto manual"
+                                        value={manualName}
+                                        onChange={(e) => { setManualName(e.target.value); setProductInput(e.target.value); }}
+                                        disabled={loading}
+                                    />
+                                </div>
+                                <div style={{ width: '180px' }}>
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        placeholder="Precio (€) opcional"
+                                        value={manualPrice}
+                                        onChange={(e) => setManualPrice(e.target.value)}
+                                        disabled={loading}
+                                    />
+                                </div>
                                 <Button
                                     type="submit"
                                     disabled={loading || !manualName.trim()}
