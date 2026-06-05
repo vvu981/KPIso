@@ -14,6 +14,9 @@ jobs:
   backend-test:
     name: Backend Build & Test
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
 
     services:
       postgres:
@@ -57,12 +60,13 @@ jobs:
           path: KPIso-backend/target/site/jacoco/
 
       - name: Add JaCoCo Report to Job Summary
-        uses: madrazo/jacoco-report@v1.2
+        uses: madrapps/jacoco-report@v1.6.1
         if: always()
         with:
           paths: ${{ github.workspace }}/KPIso-backend/target/site/jacoco/jacoco.xml
           token: ${{ secrets.GITHUB_TOKEN }}
-          min-coverage-default: 60
+          min-coverage-overall: 60
+          min-coverage-changed-files: 60
           title: "Reporte de Cobertura de Código"
           update-comment: true
 
