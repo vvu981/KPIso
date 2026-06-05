@@ -43,8 +43,8 @@ public class AuthController {
                 .accessToken(tokens.getAccessToken())
                 .userId(tokens.getUserId())
                 .username(tokens.getUsername())
-            .email(tokens.getEmail())
-            .profilePictureUrl(tokens.getProfilePictureUrl())
+                .email(tokens.getEmail())
+                .profilePictureUrl(tokens.getProfilePictureUrl())
                 .build();
 
         return ResponseEntity.ok()

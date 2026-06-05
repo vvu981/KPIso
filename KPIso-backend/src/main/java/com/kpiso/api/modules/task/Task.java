@@ -55,12 +55,16 @@ public class Task {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
-    
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "completed_by_id")
-    private User completedBy; // NUEVO: Héroe o rescatador que cerró la tarea
+    private User completedBy;
 
     @Column(name = "completed_at")
-    private LocalDateTime completedAt; // NUEVO: Fecha exacta de cierre para evaluar expiraciones
+    private LocalDateTime completedAt;
 
+    // Motor de Automatización: Referencia al siguiente ciclo para evitar duplicados
+    // infinitos
+    @Column(name = "next_task_id")
+    private UUID nextTaskId;
 }

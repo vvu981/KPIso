@@ -32,4 +32,14 @@ public class HouseMember {
 
     @Column(nullable = false, length = 7)
     private String color;
+
+    // Control de ciclo de vida: preserva el historial financiero cuando alguien se
+    // marcha
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean active = true;
+
+    @Column(name = "settle_approved", nullable = false, columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean settleApproved = false;
 }

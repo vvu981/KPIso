@@ -45,6 +45,12 @@ public class Expense {
     )
     private List<User> participants;
 
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "expense_exact_splits", joinColumns = @JoinColumn(name = "expense_id"))
+    @MapKeyColumn(name = "user_id")
+    @Column(name = "amount", precision = 10, scale = 2)
+    private java.util.Map<UUID, BigDecimal> exactSplits;
+
     @Column(nullable = false)
     private boolean settled;
 

@@ -1,5 +1,5 @@
 # Etapa 1: Compilación de la interfaz
-FROM node:20-alpine AS build
+FROM node:20 AS build
 WORKDIR /app
 
 # Pasar la variable de la API en tiempo de construcción
@@ -7,7 +7,8 @@ ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
 
 COPY package*.json ./
-RUN npm install
+RUN rm -rf node_modules package-lock.json
+RUN npm install --legacy-peer-deps
 
 COPY . .
 RUN npm run build

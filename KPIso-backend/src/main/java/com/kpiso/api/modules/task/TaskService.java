@@ -9,7 +9,7 @@ import com.kpiso.api.modules.task.dto.TaskResponse;
 import com.kpiso.api.modules.user.User;
 import com.kpiso.api.modules.user.UserRepository;
 import com.kpiso.api.modules.activity.ActivityLogService;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
@@ -29,8 +29,8 @@ public class TaskService {
     private final ActivityLogService activityLogService;
 
     public TaskService(TaskRepository taskRepository, HouseRepository houseRepository,
-                       UserRepository userRepository, HouseMemberRepository houseMemberRepository,
-                       ActivityLogService activityLogService) {
+            UserRepository userRepository, HouseMemberRepository houseMemberRepository,
+            ActivityLogService activityLogService) {
         this.taskRepository = taskRepository;
         this.houseRepository = houseRepository;
         this.userRepository = userRepository;
@@ -45,6 +45,7 @@ public class TaskService {
 
         List<Task> createdTasks = new ArrayList<>();
         LocalDateTime currentDate = request.getStartDate() != null ? request.getStartDate() : LocalDateTime.now();
+        currentDate = currentDate.with(java.time.LocalTime.of(23, 59, 59));
 
         if (request.getRotationType() == RotationType.FIXED) {
             if (request.getAssignedToId() == null) {
@@ -67,69 +68,189 @@ public class TaskService {
             createdTasks.add(taskRepository.save(task));
 
         } else {
-            List<User> participants = new ArrayList<>();
-            if (request.getParticipantIds() != null && !request.getParticipantIds().isEmpty()) {
-                for (UUID userId : request.getParticipantIds()) {
-                    User user = userRepository.findById(userId)
-                            .orElseThrow(() -> new IllegalArgumentException("El usuario no existe"));
-                    if (!houseMemberRepository.existsByHouseIdAndUserId(request.getHouseId(), userId)) {
-                        throw new IllegalArgumentException("El usuario no pertenece a esta casa");
+            // Opción B: proyectar y persistir N ocurrencias encadenadas via nextTaskId
+            List<HouseMember> activeMembers = houseMemberRepository.findByHouseId(request.getHouseId())
+                    .stream()
+                    .filter(HouseMember::isActive)
+                    .collect(Collectors.toList());
+
+            // Preparar la lista de fechas según el tipo de rotación y specificDays
+            int occurrences = request.getOccurrencesToProject() != null ? request.getOccurrencesToProject() : 1;
+            List<LocalDateTime> dates = new ArrayList<>();
+
+            if (request.getRotationType() == RotationType.DAILY) {
+                for (int i = 0; i < occurrences; i++) {
+                    dates.add(currentDate.plusDays(i));
+                }
+            } else if (request.getRotationType() == RotationType.WEEKLY) {
+                // specificDays: list of DayOfWeek values (1=Monday...7=Sunday) expected
+                List<Integer> specific = request.getSpecificDays();
+                if (specific == null || specific.isEmpty()) {
+                    // fallback: same weekday as startDate
+                    int weekday = currentDate.getDayOfWeek().getValue();
+                    specific = List.of(weekday);
+                }
+                LocalDateTime cursor = currentDate;
+                while (dates.size() < occurrences) {
+                    if (specific.contains(cursor.getDayOfWeek().getValue())) {
+                        dates.add(cursor);
                     }
-                    participants.add(user);
+                    cursor = cursor.plusDays(1);
+                }
+            } else if (request.getRotationType() == RotationType.MONTHLY) {
+                for (int i = 0; i < occurrences; i++) {
+                    dates.add(currentDate.plusMonths(i));
                 }
             } else {
-                List<HouseMember> members = houseMemberRepository.findByHouseId(request.getHouseId());
-                for (HouseMember member : members) {
-                    participants.add(member.getUser());
+                // default to daily
+                for (int i = 0; i < occurrences; i++) {
+                    dates.add(currentDate.plusDays(i));
                 }
+            }
+
+            // Determinar asignación rotativa entre participantes o miembros activos
+            List<User> participants = new ArrayList<>();
+            if (request.getParticipantIds() != null && !request.getParticipantIds().isEmpty()) {
+                for (UUID uid : request.getParticipantIds()) {
+                    if (!houseMemberRepository.existsByHouseIdAndUserId(request.getHouseId(), uid)) {
+                        throw new IllegalArgumentException("El usuario no pertenece a esta casa");
+                    }
+                    User u = userRepository.findById(uid)
+                            .orElseThrow(() -> new IllegalArgumentException("El usuario no pertenece a esta casa"));
+                    participants.add(u);
+                }
+            } else {
+                // usar todos los miembros activos
+                for (HouseMember hm : activeMembers)
+                    participants.add(hm.getUser());
             }
 
             if (participants.isEmpty()) {
                 throw new IllegalArgumentException("No se pueden crear tareas rotativas sin participantes");
             }
 
-            int totalOccurrences = request.getOccurrencesToProject() != null ? request.getOccurrencesToProject() : participants.size();
-            int participantIndex = 0;
+            // Si se proporciona un primer responsable, reordenamos la lista en memoria situándolo en la posición 0
+            if (request.getFirstResponsibleId() != null) {
+                int firstIndex = -1;
+                for (int j = 0; j < participants.size(); j++) {
+                    if (participants.get(j).getId().equals(request.getFirstResponsibleId())) {
+                        firstIndex = j;
+                        break;
+                    }
+                }
+                if (firstIndex != -1) {
+                    List<User> reordered = new ArrayList<>();
+                    for (int j = firstIndex; j < participants.size(); j++) {
+                        reordered.add(participants.get(j));
+                    }
+                    for (int j = 0; j < firstIndex; j++) {
+                        reordered.add(participants.get(j));
+                    }
+                    participants = reordered;
+                }
+            }
 
-            for (int i = 0; i < totalOccurrences; i++) {
-                User assignee = participants.get(participantIndex);
-                currentDate = calculateNextDueDate(currentDate, request.getRotationType(), request.getSpecificDays(), i == 0);
+            // Crear tareas y encadenarlas
+            Task previous = null;
+            for (int i = 0; i < dates.size(); i++) {
+                LocalDateTime due = dates.get(i);
+                User assignee = participants.get(i % participants.size());
 
-                Task task = Task.builder()
-                        .title(request.getTitle() + " (Turno " + (i + 1) + ")")
+                String title = request.getTitle();
+                if (occurrences > 1)
+                    title = String.format("%s (Turno %d)", request.getTitle(), i + 1);
+
+                Task t = Task.builder()
+                        .title(title)
                         .description(request.getDescription())
                         .points(request.getPoints())
                         .status(TaskStatus.PENDING)
                         .rotationType(request.getRotationType())
-                        .dueDate(currentDate)
+                        .dueDate(due)
                         .house(house)
                         .assignedTo(assignee)
                         .build();
 
-                createdTasks.add(taskRepository.save(task));
-                participantIndex = (participantIndex + 1) % participants.size();
+                Task saved = taskRepository.save(t);
+                createdTasks.add(saved);
+
+                if (previous != null) {
+                    // enlazar previous -> saved
+                    previous.setNextTaskId(saved.getId());
+                    taskRepository.save(previous);
+                }
+                previous = saved;
             }
         }
 
         return createdTasks.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
-    private LocalDateTime calculateNextDueDate(LocalDateTime current, RotationType type, List<Integer> specificDays, boolean isFirst) {
-        if (!isFirst) {
-            if (type == RotationType.DAILY) current = current.plusDays(1);
-            else if (type == RotationType.WEEKLY && (specificDays == null || specificDays.isEmpty())) current = current.plusWeeks(1);
-            else if (type == RotationType.MONTHLY) current = current.plusMonths(1);
-        }
+    /**
+     * Motor Autónomo de Rotación.
+     * Se ejecuta todos los días a las 00:00. Evalúa las tareas expiradas y genera
+     * los nuevos turnos.
+     */
+    @Scheduled(cron = "0 0 0 * * ?")
+    @Transactional
+    public void executeDailyTaskRotation() {
+        List<Task> tasksToRotate = taskRepository
+                .findByRotationTypeNotAndNextTaskIdIsNullAndDueDateLessThanEqualAndDeletedAtIsNull(
+                        RotationType.FIXED, LocalDateTime.now());
 
-        if (type == RotationType.WEEKLY && specificDays != null && !specificDays.isEmpty()) {
-            int safetyCheck = 0;
-            if (!isFirst) current = current.plusDays(1);
-            while (!specificDays.contains(current.getDayOfWeek().getValue()) && safetyCheck < 14) {
-                current = current.plusDays(1);
-                safetyCheck++;
+        for (Task oldTask : tasksToRotate) {
+            List<HouseMember> activeMembers = houseMemberRepository.findByHouseId(oldTask.getHouse().getId())
+                    .stream()
+                    .filter(HouseMember::isActive)
+                    .collect(Collectors.toList());
+
+            if (activeMembers.isEmpty())
+                continue;
+
+            // Algoritmo circular para encontrar al siguiente responsable activo
+            int currentIndex = -1;
+            if (oldTask.getAssignedTo() != null) {
+                for (int i = 0; i < activeMembers.size(); i++) {
+                    if (activeMembers.get(i).getUser().getId().equals(oldTask.getAssignedTo().getId())) {
+                        currentIndex = i;
+                        break;
+                    }
+                }
             }
+            int nextIndex = (currentIndex + 1) % activeMembers.size();
+            User nextUser = activeMembers.get(nextIndex).getUser();
+
+            LocalDateTime nextDueDate = calculateNextDateBase(oldTask.getDueDate(), oldTask.getRotationType());
+
+            Task nextTask = Task.builder()
+                    .title(oldTask.getTitle())
+                    .description(oldTask.getDescription())
+                    .points(oldTask.getPoints())
+                    .status(TaskStatus.PENDING)
+                    .rotationType(oldTask.getRotationType())
+                    .dueDate(nextDueDate)
+                    .house(oldTask.getHouse())
+                    .assignedTo(nextUser)
+                    .build();
+
+            nextTask = taskRepository.save(nextTask);
+
+            // Se sella la rotación para evitar loops infinitos
+            oldTask.setNextTaskId(nextTask.getId());
+            taskRepository.save(oldTask);
         }
-        return current;
+    }
+
+    private LocalDateTime calculateNextDateBase(LocalDateTime current, RotationType type) {
+        if (current == null)
+            current = LocalDateTime.now();
+        if (type == RotationType.DAILY)
+            return current.plusDays(1);
+        if (type == RotationType.WEEKLY)
+            return current.plusWeeks(1);
+        if (type == RotationType.MONTHLY)
+            return current.plusMonths(1);
+        return current.plusDays(1);
     }
 
     @Transactional(readOnly = true)
@@ -183,7 +304,6 @@ public class TaskService {
         task.setPoints(request.getPoints());
         task.setRotationType(request.getRotationType());
 
-        // CORRECCIÓN SOLID: Si el formulario de edición envía una fecha específica, se actualiza el día límite de este turno
         if (request.getStartDate() != null) {
             task.setDueDate(request.getStartDate());
         }
@@ -222,7 +342,8 @@ public class TaskService {
     private TaskResponse mapToResponse(Task task) {
         TaskResponse.AssignedUserResponse userDto = null;
         if (task.getAssignedTo() != null) {
-            String memberColor = houseMemberRepository.findByHouseIdAndUserId(task.getHouse().getId(), task.getAssignedTo().getId())
+            String memberColor = houseMemberRepository
+                    .findByHouseIdAndUserId(task.getHouse().getId(), task.getAssignedTo().getId())
                     .map(HouseMember::getColor)
                     .orElse("#6366f1");
 
@@ -245,7 +366,6 @@ public class TaskService {
                 .build();
     }
 
-    // MODIFICADO: Sistema unificado de auditoría transparente que elimina el uso de SecurityContextHolder
     @Transactional
     public void toggleTaskStatus(UUID taskId, String targetStatusStr, UUID userId) {
         Task task = taskRepository.findById(taskId)
@@ -254,7 +374,6 @@ public class TaskService {
         TaskStatus targetStatus = TaskStatus.valueOf(targetStatusStr.toUpperCase());
         task.setStatus(targetStatus);
 
-        // Identificamos directamente al actor que realiza la petición web por su ID
         User actor = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario ejecutor no encontrado"));
 
@@ -262,19 +381,20 @@ public class TaskService {
             task.setCompletedBy(actor);
             task.setCompletedAt(LocalDateTime.now());
 
-            // Registro inteligente en el diario de transparencia
             String msg;
             User assigned = task.getAssignedTo();
-            if (assigned != null && !assigned.getId().equals(userId) && task.getDueDate() != null && task.getCompletedAt().isAfter(task.getDueDate())) {
+            if (assigned != null && !assigned.getId().equals(userId) && task.getDueDate() != null
+                    && task.getCompletedAt().isAfter(task.getDueDate())) {
                 msg = String.format("%s rescató el deber vencido '%s' de %s (+%d pts para %s, -%d pts para %s)",
-                        actor.getUsername(), task.getTitle(), assigned.getUsername(), task.getPoints(), actor.getUsername(), task.getPoints(), assigned.getUsername());
+                        actor.getUsername(), task.getTitle(), assigned.getUsername(), task.getPoints(),
+                        actor.getUsername(), task.getPoints(), assigned.getUsername());
                 activityLogService.log(msg, "UPDATE", task.getHouse(), actor);
             } else {
-                msg = String.format("%s completó el deber '%s' (+%d pts)", actor.getUsername(), task.getTitle(), task.getPoints());
+                msg = String.format("%s completó el deber '%s' (+%d pts)", actor.getUsername(), task.getTitle(),
+                        task.getPoints());
                 activityLogService.log(msg, "UPDATE", task.getHouse(), actor);
             }
         } else {
-            // Al reabrir, limpiamos las auditorías de cierre de la base de datos
             task.setCompletedBy(null);
             task.setCompletedAt(null);
 

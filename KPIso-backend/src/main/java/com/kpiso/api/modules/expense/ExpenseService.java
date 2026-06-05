@@ -24,16 +24,19 @@ public class ExpenseService {
     private final HouseMemberRepository houseMemberRepository;
     private final ActivityLogService activityLogService;
     private final TaskRepository taskRepository;
+    private final DirectPaymentRepository directPaymentRepository;
 
     public ExpenseService(ExpenseRepository expenseRepository, HouseRepository houseRepository,
                           UserRepository userRepository, HouseMemberRepository houseMemberRepository,
-                          ActivityLogService activityLogService, TaskRepository taskRepository) {
+                          ActivityLogService activityLogService, TaskRepository taskRepository,
+                          DirectPaymentRepository directPaymentRepository) {
         this.expenseRepository = expenseRepository;
         this.houseRepository = houseRepository;
         this.userRepository = userRepository;
         this.houseMemberRepository = houseMemberRepository;
         this.activityLogService = activityLogService;
         this.taskRepository = taskRepository;
+        this.directPaymentRepository = directPaymentRepository;
     }
 
     @Transactional
@@ -49,7 +52,9 @@ public class ExpenseService {
 
         Expense expense = Expense.builder()
                 .title(request.getTitle()).amount(request.getAmount()).house(house)
-                .paidBy(paidBy).participants(participants).settled(false).build();
+                .paidBy(paidBy).participants(participants)
+                .exactSplits(request.getExactSplits())
+                .settled(false).build();
 
         Expense saved = expenseRepository.save(expense);
         String type = expense.getTitle().startsWith("Liquidación:") ? "PAYMENT" : "CREATE";
@@ -78,6 +83,7 @@ public class ExpenseService {
         expense.setTitle(request.getTitle());
         expense.setAmount(request.getAmount());
         expense.setParticipants(userRepository.findAllById(request.getParticipantIds()));
+        expense.setExactSplits(request.getExactSplits());
 
         Expense updated = expenseRepository.save(expense);
         activityLogService.log(String.format("%s actualizó el gasto '%s'", modifier.getUsername(), expense.getTitle()), "UPDATE", expense.getHouse(), modifier);
@@ -127,11 +133,19 @@ public class ExpenseService {
             UUID payerId = e.getPaidBy().getId();
             rawBalances.put(payerId, rawBalances.getOrDefault(payerId, BigDecimal.ZERO).add(e.getAmount()));
 
-            BigDecimal share = e.getAmount().divide(BigDecimal.valueOf(e.getParticipants().size()), 2, RoundingMode.HALF_UP);
-            for (User participant : e.getParticipants()) {
-                UUID pId = participant.getId();
-                rawBalances.put(pId, rawBalances.getOrDefault(pId, BigDecimal.ZERO).subtract(share));
+            Map<UUID, BigDecimal> splits = calculateSplits(e);
+            for (Map.Entry<UUID, BigDecimal> entry : splits.entrySet()) {
+                UUID pId = entry.getKey();
+                rawBalances.put(pId, rawBalances.getOrDefault(pId, BigDecimal.ZERO).subtract(entry.getValue()));
             }
+        }
+
+        List<DirectPayment> directPayments = directPaymentRepository.findByHouseIdAndSettledFalse(houseId);
+        for (DirectPayment dp : directPayments) {
+            UUID senderId = dp.getSender().getId();
+            UUID recipientId = dp.getRecipient().getId();
+            rawBalances.put(senderId, rawBalances.getOrDefault(senderId, BigDecimal.ZERO).add(dp.getAmount()));
+            rawBalances.put(recipientId, rawBalances.getOrDefault(recipientId, BigDecimal.ZERO).subtract(dp.getAmount()));
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -179,8 +193,12 @@ public class ExpenseService {
         Map<UUID, MemberStatusResponse> statuses = new HashMap<>();
         for (HouseMember m : members) {
             UUID uId = m.getUser().getId();
+            BigDecimal bal = rawBalances.get(uId);
+            if (bal != null && bal.abs().compareTo(BigDecimal.valueOf(0.05)) <= 0) {
+                bal = BigDecimal.ZERO;
+            }
             statuses.put(uId, MemberStatusResponse.builder()
-                    .balance(rawBalances.get(uId))
+                    .balance(bal)
                     .color(colors.get(uId))
                     .points(pointsMap.get(uId))
                     .build());
@@ -204,18 +222,32 @@ public class ExpenseService {
         for (Expense e : expenses) {
             UUID payerId = e.getPaidBy().getId();
             balances.put(payerId, balances.getOrDefault(payerId, BigDecimal.ZERO).add(e.getAmount()));
-            BigDecimal share = e.getAmount().divide(BigDecimal.valueOf(e.getParticipants().size()), 2, RoundingMode.HALF_UP);
-            for (User p : e.getParticipants()) {
-                balances.put(p.getId(), balances.getOrDefault(p.getId(), BigDecimal.ZERO).subtract(share));
+            
+            Map<UUID, BigDecimal> splits = calculateSplits(e);
+            for (Map.Entry<UUID, BigDecimal> entry : splits.entrySet()) {
+                UUID pId = entry.getKey();
+                balances.put(pId, balances.getOrDefault(pId, BigDecimal.ZERO).subtract(entry.getValue()));
             }
+        }
+
+        List<DirectPayment> directPayments = directPaymentRepository.findByHouseIdAndSettledFalse(houseId);
+        for (DirectPayment dp : directPayments) {
+            UUID senderId = dp.getSender().getId();
+            UUID recipientId = dp.getRecipient().getId();
+            balances.put(senderId, balances.getOrDefault(senderId, BigDecimal.ZERO).add(dp.getAmount()));
+            balances.put(recipientId, balances.getOrDefault(recipientId, BigDecimal.ZERO).subtract(dp.getAmount()));
         }
 
         List<Map.Entry<UUID, BigDecimal>> debtors = new ArrayList<>();
         List<Map.Entry<UUID, BigDecimal>> creditors = new ArrayList<>();
 
         for (Map.Entry<UUID, BigDecimal> entry : balances.entrySet()) {
-            if (entry.getValue().compareTo(BigDecimal.valueOf(0.01)) > 0) creditors.add(new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue()));
-            else if (entry.getValue().compareTo(BigDecimal.valueOf(-0.01)) < 0) debtors.add(new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue().abs()));
+            BigDecimal bal = entry.getValue();
+            if (bal.abs().compareTo(BigDecimal.valueOf(0.01)) <= 0) {
+                continue;
+            }
+            if (bal.compareTo(BigDecimal.ZERO) > 0) creditors.add(new AbstractMap.SimpleEntry<>(entry.getKey(), bal));
+            else if (bal.compareTo(BigDecimal.ZERO) < 0) debtors.add(new AbstractMap.SimpleEntry<>(entry.getKey(), bal.abs()));
         }
 
         List<DebtSettlementResponse> settlements = new ArrayList<>();
@@ -228,18 +260,67 @@ public class ExpenseService {
             settlements.add(DebtSettlementResponse.builder().debtorId(debtor.getKey()).debtorUsername(usernames.get(debtor.getKey())).creditorId(creditor.getKey()).creditorUsername(usernames.get(creditor.getKey())).amount(minAmount).build());
             debtor.setValue(debtor.getValue().subtract(minAmount));
             creditor.setValue(creditor.getValue().subtract(minAmount));
-            if (debtor.getValue().compareTo(BigDecimal.valueOf(0.01)) < 0) dIdx++;
-            if (creditor.getValue().compareTo(BigDecimal.valueOf(0.01)) < 0) cIdx++;
+            if (debtor.getValue().compareTo(BigDecimal.ZERO) <= 0) dIdx++;
+            if (creditor.getValue().compareTo(BigDecimal.ZERO) <= 0) cIdx++;
         }
         return settlements;
     }
 
+    private Map<UUID, BigDecimal> calculateSplits(Expense e) {
+        Map<UUID, BigDecimal> splits = new HashMap<>();
+        if (e.getExactSplits() != null && !e.getExactSplits().isEmpty()) {
+            return e.getExactSplits();
+        }
+
+        List<User> participants = e.getParticipants();
+        int numParticipants = participants.size();
+        if (numParticipants == 0) {
+            return splits;
+        }
+
+        long totalCents = e.getAmount().movePointRight(2).setScale(0, RoundingMode.HALF_UP).longValue();
+        long baseShareCents = totalCents / numParticipants;
+        long remainderCents = totalCents % numParticipants;
+
+        for (int i = 0; i < numParticipants; i++) {
+            long cents = baseShareCents + (i < remainderCents ? 1 : 0);
+            BigDecimal share = BigDecimal.valueOf(cents).movePointLeft(2);
+            splits.put(participants.get(i).getId(), share);
+        }
+
+        return splits;
+    }
+
     @Transactional
-    public void settleAllHouseExpenses(UUID houseId) {
+    public void settleAllHouseExpenses(UUID houseId, UUID userId) {
+        HouseMember requester = houseMemberRepository.findByHouseIdAndUserId(houseId, userId)
+                .orElseThrow(() -> new IllegalArgumentException("No perteneces a esta vivienda"));
+        if (requester.getRole() != HouseRole.ADMIN) {
+            throw new IllegalStateException("Solo el administrador puede liquidar las cuentas.");
+        }
+
+        List<HouseMember> members = houseMemberRepository.findByHouseId(houseId);
+        List<HouseMember> activeMembers = members.stream().filter(HouseMember::isActive).collect(Collectors.toList());
+        
+        boolean allApproved = activeMembers.stream().allMatch(HouseMember::isSettleApproved);
+        if (!allApproved) {
+            throw new IllegalStateException("No todos los convivientes han aprobado la liquidación.");
+        }
+
         List<Expense> expenses = expenseRepository.findByHouseIdAndSettledFalse(houseId);
         for (Expense e : expenses) {
             e.setSettled(true);
             expenseRepository.save(e);
+        }
+        List<DirectPayment> directPayments = directPaymentRepository.findByHouseIdAndSettledFalse(houseId);
+        for (DirectPayment dp : directPayments) {
+            dp.setSettled(true);
+            directPaymentRepository.save(dp);
+        }
+
+        for (HouseMember m : activeMembers) {
+            m.setSettleApproved(false);
+            houseMemberRepository.save(m);
         }
     }
 

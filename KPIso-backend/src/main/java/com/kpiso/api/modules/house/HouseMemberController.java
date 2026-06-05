@@ -28,4 +28,15 @@ public class HouseMemberController {
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
+
+    @PatchMapping("/settle-approval")
+    public ResponseEntity<?> updateSettleApproval(@PathVariable UUID houseId, @RequestParam UUID userId, @RequestParam boolean approved) {
+        return houseMemberRepository.findByHouseIdAndUserId(houseId, userId)
+                .map(member -> {
+                    member.setSettleApproved(approved);
+                    houseMemberRepository.save(member);
+                    return ResponseEntity.ok().build();
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
 }

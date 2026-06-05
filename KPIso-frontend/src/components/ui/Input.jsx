@@ -20,9 +20,10 @@
  * @param {boolean} mono — fuente monoespaciada (para códigos)
  * @param {boolean} autoFocus — enfoque automático
  */
+import { forwardRef } from 'react';
 import { IconXCircle, IconCheckCircle } from './Icons.jsx';
 
-export function Input({
+export const Input = forwardRef(({
     label,
     id,
     type = 'text',
@@ -38,7 +39,7 @@ export function Input({
     autoFocus = false,
     className = '',
     ...rest
-}) {
+}, ref) => {
     const inputClasses = [
         'form-input',
         error ? 'input-error' : success ? 'input-success' : '',
@@ -55,6 +56,7 @@ export function Input({
                 </label>
             )}
             <input
+                ref={ref}
                 id={id}
                 type={type}
                 value={value}
@@ -85,4 +87,6 @@ export function Input({
             )}
         </div>
     );
-}
+});
+
+Input.displayName = 'Input';
