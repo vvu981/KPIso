@@ -776,17 +776,17 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
             {!isReadOnly && (
                 /* Formulario de Añadir Producto */
                 <Card>
-                    <div className="p-5 border-b border-gray-200">
+                    <div className="p-5 border-b border-border-subtle">
                         <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Añadir Producto</h3>
                         {/* Selector de modo */}
-                        <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl mb-5 max-w-[320px] border border-gray-200/50 dark:border-gray-700/50">
+                        <div className="flex bg-bg-elevated p-1 rounded-xl mb-5 max-w-[320px] border border-border-subtle">
                             <button
                                 type="button"
                                 onClick={() => { setManualMode(false); setProductInput(''); }}
                                 className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all ${
                                     !manualMode
-                                        ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-white shadow-sm'
-                                        : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                                        ? 'bg-bg-surface dark:bg-bg-base text-accent dark:text-accent-light shadow-sm'
+                                        : 'text-text-secondary hover:text-text-primary'
                                 }`}
                                 style={{ border: 'none', cursor: 'pointer' }}
                             >
@@ -800,8 +800,8 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                                 onClick={() => { setManualMode(true); setProductInput(''); setManualName(''); setManualPrice(''); }}
                                 className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all ${
                                     manualMode
-                                        ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-white shadow-sm'
-                                        : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                                        ? 'bg-bg-surface dark:bg-bg-base text-accent dark:text-accent-light shadow-sm'
+                                        : 'text-text-secondary hover:text-text-primary'
                                 }`}
                                 style={{ border: 'none', cursor: 'pointer' }}
                             >
@@ -1060,7 +1060,7 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
 
                 return (
                     <Card style={{ overflow: 'visible' }}>
-                    <div className="p-5 border-b border-gray-200 flex items-center justify-between gap-3">
+                    <div className="p-5 border-b border-border-subtle flex items-center justify-between gap-3">
                             <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
                                 Productos por Comprar ({shoppingList.pendingItems.length})
                             </h3>
@@ -1096,7 +1096,7 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                                 </button>
                             )}
                         </div>
-                        <div className="divide-y divide-gray-200">
+                        <div className="divide-y divide-border-subtle">
                             {groups.map(group => {
                                 const rep = group.items[0]; // representante del grupo
                                 const qty = group.items.length;
@@ -1123,7 +1123,7 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                                                     <img
                                                         src={rep.imageUrl}
                                                         alt={rep.name}
-                                                        className="w-14 h-14 object-cover rounded-md bg-gray-100 border border-gray-200"
+                                                        className="w-14 h-14 object-cover rounded-md bg-bg-elevated border border-border-subtle"
                                                         onError={e => { e.target.style.display = 'none'; }}
                                                     />
                                                 ) : (
@@ -1159,10 +1159,10 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
 
                                                     {/* Selector de asignación de grupo */}
                                                     <div className="relative flex items-center gap-1.5">
-                                                        <span className="text-xs text-gray-500 font-medium">Para:</span>
+                                                        <span className="text-xs text-text-secondary font-medium">Para:</span>
                                                         <div className="relative group-assign-dropdown-container">
                                                             {isReadOnly ? (
-                                                                <span className="text-xs font-medium text-gray-700">{assignLabel}</span>
+                                                                <span className="text-xs font-medium text-text-primary">{assignLabel}</span>
                                                             ) : (
                                                                 <button
                                                                     type="button"
@@ -1170,7 +1170,7 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                                                                         setOpenGroupDropdown(isGroupDropOpen ? null : group.key);
                                                                         setOpenDropdownId(null);
                                                                     }}
-                                                                    className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 focus:outline-none transition-colors"
+                                                                    className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium border bg-bg-surface border-border-default text-text-primary hover:bg-bg-elevated-hover focus:outline-none transition-colors"
                                                                 >
                                                                     <span className="truncate max-w-[120px]">{assignLabel}</span>
                                                                     <IconChevronDown />
@@ -1184,12 +1184,12 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                                                                         onClick={() => setOpenGroupDropdown(null)}
                                                                     />
                                                                     <div 
-                                                                        className="absolute right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-2 min-w-[190px] flex flex-col gap-1"
+                                                                        className="absolute right-0 mt-1 bg-bg-elevated border border-border-default rounded-md shadow-lg p-2 min-w-[190px] flex flex-col gap-1"
                                                                         style={{ zIndex: 1000 }}
                                                                     >
                                                                         {qty === 1 ? (
                                                                             <>
-                                                                                <div className="px-2 py-1 text-[10px] uppercase tracking-wider font-semibold text-gray-400 border-b border-gray-100 mb-1">
+                                                                                <div className="px-2 py-1 text-[10px] uppercase tracking-wider font-semibold text-text-tertiary border-b border-border-subtle mb-1">
                                                                                     Asignar a:
                                                                                 </div>
                                                                                 {houseMembers.map(member => {
@@ -1197,29 +1197,29 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                                                                                     return (
                                                                                         <label
                                                                                             key={member.userId}
-                                                                                            className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer text-xs select-none"
+                                                                                            className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-bg-elevated-hover cursor-pointer text-xs select-none text-text-primary"
                                                                                         >
                                                                                             <input
                                                                                                 type="checkbox"
-                                                                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
+                                                                                                className="rounded border-border-default text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
                                                                                                 checked={checked}
                                                                                                 onChange={() => handleToggleMember(rep, member.userId)}
                                                                                             />
-                                                                                            <span className="text-gray-700 font-medium">{member.username}</span>
+                                                                                            <span className="text-text-primary font-medium">{member.username}</span>
                                                                                         </label>
                                                                                     );
                                                                                 })}
                                                                             </>
                                                                         ) : (
                                                                             <>
-                                                                                <div className="px-2 py-1 text-[10px] uppercase tracking-wider font-semibold text-gray-400 border-b border-gray-100 mb-1">
+                                                                                <div className="px-2 py-1 text-[10px] uppercase tracking-wider font-semibold text-text-tertiary border-b border-border-subtle mb-1">
                                                                                     Pagar por:
                                                                                 </div>
                                                                                 {/* Opción Todos */}
                                                                                 <button
                                                                                     type="button"
-                                                                                    className={`flex items-center gap-2 px-2 py-1.5 rounded text-xs font-medium hover:bg-gray-50 w-full text-left transition-colors ${
-                                                                                        assignMode === 'all' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700'
+                                                                                    className={`flex items-center gap-2 px-2 py-1.5 rounded text-xs font-medium hover:bg-bg-elevated-hover w-full text-left transition-colors ${
+                                                                                        assignMode === 'all' ? 'bg-accent-ultra-light text-accent dark:text-accent-light' : 'text-text-primary'
                                                                                     }`}
                                                                                     onClick={() => { handleSetGroupAssignment(group.items, 'all'); setOpenGroupDropdown(null); }}
                                                                                 >
@@ -1231,8 +1231,8 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                                                                                     <button
                                                                                         key={m.userId}
                                                                                         type="button"
-                                                                                        className={`flex items-center gap-2 px-2 py-1.5 rounded text-xs font-medium hover:bg-gray-50 w-full text-left transition-colors ${
-                                                                                            assignMode === 'single' && assignUserId === m.userId ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700'
+                                                                                        className={`flex items-center gap-2 px-2 py-1.5 rounded text-xs font-medium hover:bg-bg-elevated-hover w-full text-left transition-colors ${
+                                                                                            assignMode === 'single' && assignUserId === m.userId ? 'bg-accent-ultra-light text-accent dark:text-accent-light' : 'text-text-primary'
                                                                                         }`}
                                                                                         onClick={() => { handleSetGroupAssignment(group.items, 'single', m.userId); setOpenGroupDropdown(null); }}
                                                                                     >
@@ -1245,11 +1245,11 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                                                                                 {/* Opción Personalizado — solo visible si hay >1 item */}
                                                                                 {qty > 1 && (
                                                                                     <>
-                                                                                        <div className="border-t border-gray-100 my-1" />
+                                                                                        <div className="border-t border-border-subtle my-1" />
                                                                                         <button
                                                                                             type="button"
-                                                                                            className={`flex items-center gap-2 px-2 py-1.5 rounded text-xs font-medium hover:bg-gray-50 w-full text-left transition-colors ${
-                                                                                                assignMode === 'custom' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700'
+                                                                                            className={`flex items-center gap-2 px-2 py-1.5 rounded text-xs font-medium hover:bg-bg-elevated-hover w-full text-left transition-colors ${
+                                                                                                assignMode === 'custom' ? 'bg-accent-ultra-light text-accent dark:text-accent-light' : 'text-text-primary'
                                                                                             }`}
                                                                                             onClick={() => {
                                                                                                 // Personalizado: simplemente expandir el grupo y cerrar dropdown
@@ -1333,12 +1333,12 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                                                         {/* Asignación individual */}
                                                         <div className="relative assignee-dropdown-container">
                                                             {isReadOnly ? (
-                                                                <span className="text-xs font-medium text-gray-700">{getAssigneesLabel(item.assignedUserIds)}</span>
+                                                                <span className="text-xs font-medium text-text-primary">{getAssigneesLabel(item.assignedUserIds)}</span>
                                                             ) : (
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => setOpenDropdownId(openDropdownId === item.id ? null : item.id)}
-                                                                    className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium border bg-white border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+                                                                    className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium border bg-bg-surface border-border-default text-text-secondary hover:bg-bg-elevated-hover transition-colors"
                                                                 >
                                                                     <span>{getAssigneesLabel(item.assignedUserIds)}</span>
                                                                     <IconChevronDown />
@@ -1351,10 +1351,10 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                                                                         onClick={() => setOpenDropdownId(null)}
                                                                     />
                                                                     <div 
-                                                                        className="absolute right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-2 min-w-[160px] flex flex-col gap-1"
+                                                                        className="absolute right-0 mt-1 bg-bg-elevated border border-border-default rounded-md shadow-lg p-2 min-w-[160px] flex flex-col gap-1"
                                                                         style={{ zIndex: 1000 }}
                                                                     >
-                                                                        <div className="px-2 py-1 text-[10px] uppercase tracking-wider font-semibold text-gray-400 border-b border-gray-100 mb-1">
+                                                                        <div className="px-2 py-1 text-[10px] uppercase tracking-wider font-semibold text-text-tertiary border-b border-border-subtle mb-1">
                                                                             Asignar a:
                                                                         </div>
                                                                         {houseMembers.map(member => {
@@ -1362,15 +1362,15 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                                                                             return (
                                                                                 <label
                                                                                     key={member.userId}
-                                                                                    className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer text-xs select-none"
+                                                                                    className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-bg-elevated-hover cursor-pointer text-xs select-none text-text-primary"
                                                                                 >
                                                                                     <input
                                                                                         type="checkbox"
-                                                                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
+                                                                                        className="rounded border-border-default text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
                                                                                         checked={checked}
                                                                                         onChange={() => handleToggleMember(item, member.userId)}
                                                                                     />
-                                                                                    <span className="text-gray-700 font-medium">{member.username}</span>
+                                                                                    <span className="text-text-primary font-medium">{member.username}</span>
                                                                                 </label>
                                                                             );
                                                                         })}
@@ -1406,15 +1406,15 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                         </div>
                         {/* Footer con presupuesto y checkout */}
                         <div 
-                            className="p-5 bg-gray-50 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4"
+                            className="p-5 bg-bg-surface-dark border-t border-border-subtle flex flex-col sm:flex-row justify-between items-center gap-4"
                             style={{ borderBottomLeftRadius: 'var(--radius-lg)', borderBottomRightRadius: 'var(--radius-lg)' }}
                         >
                             <div className="flex items-baseline gap-2">
-                                <span className="text-sm font-medium text-gray-500">Presupuesto Estimado:</span>
-                                <span className="text-2xl font-bold text-blue-600">
+                                <span className="text-sm font-medium text-text-secondary">Presupuesto Estimado:</span>
+                                <span className="text-2xl font-bold text-accent dark:text-accent-light">
                                     {shoppingList.estimatedBudget.toFixed(2)}€
                                 </span>
-                                <span className="text-xs text-gray-400">
+                                <span className="text-xs text-text-tertiary">
                                     ({shoppingList.pendingItems.length} {shoppingList.pendingItems.length === 1 ? 'producto' : 'productos'})
                                 </span>
                             </div>
@@ -1473,7 +1473,7 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                     <Card>
                         <button
                             onClick={() => setHistoryExpanded(!historyExpanded)}
-                            className="w-full p-5 border-b border-gray-200 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                            className="w-full p-5 border-b border-border-subtle flex items-center justify-between bg-transparent hover:bg-bg-elevated-hover transition-colors"
                         >
                             <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
                                 Historial de Compras ({shoppingList.boughtItems.length})
@@ -1575,7 +1575,7 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                     display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px'
                 }}>
                     <Card style={{ width: '100%', maxWidth: '380px', backgroundColor: 'var(--bg-surface)' }}>
-                        <div className="p-5 border-b border-gray-200 flex items-center gap-3">
+                        <div className="p-5 border-b border-border-subtle flex items-center gap-3">
                             {/* Icono de aviso */}
                             <div style={{
                                 width: 36, height: 36, borderRadius: '50%',
@@ -1626,7 +1626,7 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                     display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px'
                 }}>
                     <Card style={{ width: '100%', maxWidth: '380px', backgroundColor: 'var(--bg-surface)' }}>
-                        <div className="p-5 border-b border-gray-200 flex items-center gap-3">
+                        <div className="p-5 border-b border-border-subtle flex items-center gap-3">
                             {pendingSuggestion.imageUrl && (
                                 <img
                                     src={pendingSuggestion.imageUrl}
@@ -1735,7 +1735,7 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                     display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px'
                 }}>
                     <Card style={{ width: '100%', maxWidth: '400px', backgroundColor: 'var(--bg-surface)' }}>
-                        <div className="p-5 border-b border-gray-200">
+                        <div className="p-5 border-b border-border-subtle">
                             <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Pagar compra</h3>
                         </div>
                         <form onSubmit={handleCheckout} className="p-5 flex flex-col gap-4">
