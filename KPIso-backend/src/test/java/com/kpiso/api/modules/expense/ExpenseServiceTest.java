@@ -522,4 +522,132 @@ class ExpenseServiceTest {
         assertTrue(expenseA.isSettled());
         assertTrue(expenseB.isSettled());
     }
+
+    @Test
+    void settleAllHouseExpensesShouldThrowWhenRequesterNotFound() {
+        when(houseMemberRepository.findByHouseIdAndUserId(house.getId(), payer.getId())).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> expenseService.settleAllHouseExpenses(house.getId(), payer.getId()));
+    }
+
+    @Test
+    void settleAllHouseExpensesShouldThrowWhenNotAdmin() {
+        HouseMember member = HouseMember.builder().user(payer).role(HouseRole.MEMBER).active(true).build();
+        when(houseMemberRepository.findByHouseIdAndUserId(house.getId(), payer.getId())).thenReturn(Optional.of(member));
+        assertThrows(IllegalStateException.class, () -> expenseService.settleAllHouseExpenses(house.getId(), payer.getId()));
+    }
+
+    @Test
+    void settleAllHouseExpensesShouldThrowWhenNotAllApproved() {
+        HouseMember admin = HouseMember.builder().user(payer).role(HouseRole.ADMIN).active(true).settleApproved(true).build();
+        HouseMember member = HouseMember.builder().user(participantA).role(HouseRole.MEMBER).active(true).settleApproved(false).build();
+
+        when(houseMemberRepository.findByHouseIdAndUserId(house.getId(), payer.getId())).thenReturn(Optional.of(admin));
+        when(houseMemberRepository.findByHouseId(house.getId())).thenReturn(List.of(admin, member));
+
+        assertThrows(IllegalStateException.class, () -> expenseService.settleAllHouseExpenses(house.getId(), payer.getId()));
+    }
+
+    @Test
+    void getHouseMemberStatusesShouldHandleNullColor() {
+        User memberA = TestFixtures.user("ana", "ana@email.com");
+        HouseMember houseMemberA = HouseMember.builder().user(memberA).role(HouseRole.ADMIN).active(true).color(null).build();
+
+        when(houseMemberRepository.findByHouseId(house.getId())).thenReturn(List.of(houseMemberA));
+        when(expenseRepository.findByHouseIdAndSettledFalse(house.getId())).thenReturn(List.of());
+        when(taskRepository.findByHouseIdAndDeletedAtIsNull(house.getId())).thenReturn(List.of());
+
+        Map<UUID, MemberStatusResponse> statuses = expenseService.getHouseMemberStatuses(house.getId());
+        assertEquals("#6366f1", statuses.get(memberA.getId()).getColor());
+    }
+
+    @Test
+    void calculateSettlementsShouldHandleDirectPayments() {
+        User memberA = TestFixtures.user("ana", "ana@email.com");
+        User memberB = TestFixtures.user("bea", "bea@email.com");
+
+        HouseMember houseMemberA = TestFixtures.houseMember(house, memberA, HouseRole.ADMIN, "#ff0000");
+        HouseMember houseMemberB = TestFixtures.houseMember(house, memberB, HouseRole.MEMBER, "#00ff00");
+
+        DirectPayment dp = DirectPayment.builder()
+                .id(UUID.randomUUID())
+                .amount(new BigDecimal("5.00"))
+                .sender(memberB)
+                .recipient(memberA)
+                .settled(false)
+                .house(house)
+                .build();
+
+        when(houseMemberRepository.findByHouseId(house.getId())).thenReturn(List.of(houseMemberA, houseMemberB));
+        when(expenseRepository.findByHouseIdAndSettledFalse(house.getId())).thenReturn(List.of());
+        when(directPaymentRepository.findByHouseIdAndSettledFalse(house.getId())).thenReturn(List.of(dp));
+
+        List<DebtSettlementResponse> settlements = expenseService.calculateSettlements(house.getId());
+        assertEquals(1, settlements.size());
+        assertEquals(memberA.getId(), settlements.get(0).getDebtorId());
+        assertEquals(memberB.getId(), settlements.get(0).getCreditorId());
+        assertEquals(0, settlements.get(0).getAmount().compareTo(new BigDecimal("5.00")));
+    }
+
+    @Test
+    void updateExpenseShouldFailWhenModifierNotFound() {
+        UUID id = UUID.randomUUID();
+        Expense expense = Expense.builder().id(id).settled(false).build();
+        when(expenseRepository.findById(id)).thenReturn(Optional.of(expense));
+        when(userRepository.findById(payer.getId())).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class, () -> expenseService.updateExpense(id, CreateExpenseRequest.builder().build(), payer.getId()));
+    }
+
+    @Test
+    void deleteExpenseShouldFailWhenExpenseNotFound() {
+        UUID id = UUID.randomUUID();
+        when(expenseRepository.findById(id)).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> expenseService.deleteExpense(id, payer.getId()));
+    }
+
+    @Test
+    void deleteExpenseShouldFailWhenTerminatorNotFound() {
+        UUID id = UUID.randomUUID();
+        Expense expense = Expense.builder().id(id).settled(false).build();
+        when(expenseRepository.findById(id)).thenReturn(Optional.of(expense));
+        when(userRepository.findById(payer.getId())).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class, () -> expenseService.deleteExpense(id, payer.getId()));
+    }
+
+    @Test
+    void deleteExpenseShouldFailWhenSettled() {
+        UUID id = UUID.randomUUID();
+        Expense expense = Expense.builder().id(id).settled(true).build();
+        when(expenseRepository.findById(id)).thenReturn(Optional.of(expense));
+
+        assertThrows(IllegalStateException.class, () -> expenseService.deleteExpense(id, payer.getId()));
+    }
+
+    @Test
+    void getHouseMemberStatusesShouldIgnoreTasksInOtherMonths() {
+        User memberA = TestFixtures.user("ana", "ana@email.com");
+        HouseMember houseMemberA = HouseMember.builder().user(memberA).role(HouseRole.ADMIN).active(true).color("#ff0000").build();
+
+        // Task in another month (e.g. next month)
+        LocalDateTime futureDate = LocalDateTime.now().plusMonths(2);
+        Task futureTask = Task.builder()
+                .id(UUID.randomUUID())
+                .title("Tarea futura")
+                .points(5)
+                .status(TaskStatus.COMPLETED)
+                .dueDate(futureDate)
+                .completedAt(futureDate)
+                .completedBy(memberA)
+                .house(house)
+                .build();
+
+        when(houseMemberRepository.findByHouseId(house.getId())).thenReturn(List.of(houseMemberA));
+        when(expenseRepository.findByHouseIdAndSettledFalse(house.getId())).thenReturn(List.of());
+        when(taskRepository.findByHouseIdAndDeletedAtIsNull(house.getId())).thenReturn(List.of(futureTask));
+
+        Map<UUID, MemberStatusResponse> statuses = expenseService.getHouseMemberStatuses(house.getId());
+        assertEquals(0, statuses.get(memberA.getId()).getPoints());
+    }
 }
+

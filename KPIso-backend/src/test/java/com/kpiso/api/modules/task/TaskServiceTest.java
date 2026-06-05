@@ -724,4 +724,96 @@ class TaskServiceTest {
         when(userRepository.findById(assignee.getId())).thenReturn(Optional.empty());
         assertThrows(IllegalArgumentException.class, () -> taskService.softDeleteTask(task.getId(), assignee.getId()));
     }
-}
+
+    @Test
+    void toggleTaskStatusShouldRescueOverdueTask() {
+        Task task = Task.builder()
+                .id(UUID.randomUUID())
+                .title("Tarea")
+                .points(4)
+                .status(TaskStatus.PENDING)
+                .rotationType(RotationType.FIXED)
+                .dueDate(LocalDateTime.now().minusDays(2))
+                .house(house)
+                .assignedTo(secondAssignee)
+                .build();
+
+        when(taskRepository.findById(task.getId())).thenReturn(Optional.of(task));
+        when(userRepository.findById(rescuer.getId())).thenReturn(Optional.of(rescuer));
+        when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        taskService.toggleTaskStatus(task.getId(), "completed", rescuer.getId());
+
+        assertEquals(TaskStatus.COMPLETED, task.getStatus());
+        assertEquals(rescuer, task.getCompletedBy());
+        assertNotNull(task.getCompletedAt());
+    }
+
+    @Test
+    void toggleTaskStatusShouldLogReopenWhenNotCompleted() {
+        Task task = Task.builder()
+                .id(UUID.randomUUID())
+                .title("Tarea")
+                .points(4)
+                .status(TaskStatus.COMPLETED)
+                .rotationType(RotationType.FIXED)
+                .house(house)
+                .completedBy(rescuer)
+                .completedAt(LocalDateTime.now())
+                .build();
+
+        when(taskRepository.findById(task.getId())).thenReturn(Optional.of(task));
+        when(userRepository.findById(rescuer.getId())).thenReturn(Optional.of(rescuer));
+        when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        taskService.toggleTaskStatus(task.getId(), "pending", rescuer.getId());
+
+        assertEquals(TaskStatus.PENDING, task.getStatus());
+        assertNull(task.getCompletedBy());
+        assertNull(task.getCompletedAt());
+    }
+
+    @Test
+    void updateTaskDueDateShouldHandleNullDueDate() {
+        Task task = Task.builder()
+                .id(UUID.randomUUID())
+                .title("Limpiar")
+                .points(3)
+                .status(TaskStatus.PENDING)
+                .rotationType(RotationType.FIXED)
+                .dueDate(null)
+                .house(house)
+                .build();
+
+        when(taskRepository.findById(task.getId())).thenReturn(Optional.of(task));
+        when(userRepository.findById(creator.getId())).thenReturn(Optional.of(creator));
+        when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TaskResponse response = taskService.updateTaskDueDate(task.getId(), LocalDateTime.now(), creator.getId());
+        assertNotNull(response.getDueDate());
+    }
+
+    @Test
+    void getTasksByHouseShouldUseDefaultColorIfMemberNotFound() {
+        Task task = Task.builder()
+                .id(UUID.randomUUID())
+                .title("Limpiar")
+                .description("Cocina")
+                .points(3)
+                .status(TaskStatus.PENDING)
+                .rotationType(RotationType.FIXED)
+                .dueDate(LocalDateTime.now())
+                .house(house)
+                .assignedTo(assignee)
+                .build();
+
+        when(taskRepository.findByHouseIdAndDeletedAtIsNull(house.getId())).thenReturn(List.of(task));
+        when(houseMemberRepository.findByHouseIdAndUserId(house.getId(), assignee.getId()))
+                .thenReturn(Optional.empty());
+
+        List<TaskResponse> responses = taskService.getTasksByHouse(house.getId());
+
+        assertEquals(1, responses.size());
+        assertEquals("#6366f1", responses.get(0).getAssignedTo().getColor());
+    }
+}

@@ -523,4 +523,102 @@ class HouseServiceTest {
         IllegalStateException exception = assertThrows(IllegalStateException.class, () -> houseService.removeMember(house.getId(), guest.getId(), creator.getId()));
         assertTrue(exception.getMessage().contains("No se puede expulsar"));
     }
-}
+
+    @Test
+    void getHouseDetailSingleParamShouldMapHouseAndMembers() {
+        HouseMember adminMember = TestFixtures.houseMember(house, creator, HouseRole.ADMIN, "#6366f1");
+        HouseMember guestMember = TestFixtures.houseMember(house, guest, HouseRole.MEMBER, "#10b981");
+
+        when(houseRepository.findById(house.getId())).thenReturn(Optional.of(house));
+        when(houseMemberRepository.findByHouseId(house.getId())).thenReturn(List.of(adminMember, guestMember));
+
+        HouseDetailResponse response = houseService.getHouseDetail(house.getId());
+
+        assertEquals(house.getId(), response.getId());
+        assertEquals("Mi Piso", response.getName());
+        assertEquals(2, response.getMembers().size());
+        assertEquals(creator.getUsername(), response.getMembers().get(0).getUsername());
+    }
+
+    @Test
+    void getHouseDetailSingleParamShouldThrowWhenNotFound() {
+        when(houseRepository.findById(house.getId())).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> houseService.getHouseDetail(house.getId()));
+    }
+
+    @Test
+    void removeMemberShouldHandleExactSplits() {
+        HouseMember requester = TestFixtures.houseMember(house, creator, HouseRole.ADMIN, "#6366f1");
+        HouseMember targetMember = TestFixtures.houseMember(house, guest, HouseRole.MEMBER, "#10b981");
+
+        java.util.Map<UUID, BigDecimal> exactSplits = new java.util.HashMap<>();
+        exactSplits.put(guest.getId(), new BigDecimal("10.00"));
+
+        Expense expense = Expense.builder()
+                .id(UUID.randomUUID())
+                .title("Gasto Exacto")
+                .amount(new BigDecimal("10.00"))
+                .house(house)
+                .paidBy(creator)
+                .exactSplits(exactSplits)
+                .settled(false)
+                .build();
+
+        when(houseRepository.findById(house.getId())).thenReturn(Optional.of(house));
+        when(userRepository.findById(creator.getId())).thenReturn(Optional.of(creator));
+        when(userRepository.findById(guest.getId())).thenReturn(Optional.of(guest));
+        when(houseMemberRepository.findByHouseIdAndUserId(house.getId(), creator.getId())).thenReturn(Optional.of(requester));
+        when(expenseRepository.findByHouseIdAndSettledFalse(house.getId())).thenReturn(List.of(expense));
+        when(directPaymentRepository.findByHouseIdAndSettledFalse(house.getId())).thenReturn(List.of());
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> houseService.removeMember(house.getId(), guest.getId(), creator.getId()));
+        assertTrue(exception.getMessage().contains("No se puede expulsar"));
+    }
+
+    @Test
+    void removeMemberShouldFailWhenTargetIsPayer() {
+        HouseMember requester = TestFixtures.houseMember(house, creator, HouseRole.ADMIN, "#6366f1");
+        HouseMember targetMember = TestFixtures.houseMember(house, guest, HouseRole.MEMBER, "#10b981");
+
+        Expense expense = Expense.builder()
+                .id(UUID.randomUUID())
+                .title("Gasto Target Paga")
+                .amount(new BigDecimal("10.00"))
+                .house(house)
+                .paidBy(guest)
+                .participants(List.of(creator))
+                .settled(false)
+                .build();
+
+        when(houseRepository.findById(house.getId())).thenReturn(Optional.of(house));
+        when(userRepository.findById(creator.getId())).thenReturn(Optional.of(creator));
+        when(userRepository.findById(guest.getId())).thenReturn(Optional.of(guest));
+        when(houseMemberRepository.findByHouseIdAndUserId(house.getId(), creator.getId())).thenReturn(Optional.of(requester));
+        when(expenseRepository.findByHouseIdAndSettledFalse(house.getId())).thenReturn(List.of(expense));
+        when(directPaymentRepository.findByHouseIdAndSettledFalse(house.getId())).thenReturn(List.of());
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> houseService.removeMember(house.getId(), guest.getId(), creator.getId()));
+        assertTrue(exception.getMessage().contains("No se puede expulsar"));
+    }
+
+    @Test
+    void createHouseShouldRetryGenerateUniqueInviteCodeWhenConflict() {
+        CreateHouseRequest request = CreateHouseRequest.builder()
+                .name("Mi Piso")
+                .creatorId(creator.getId())
+                .build();
+
+        when(userRepository.findById(creator.getId())).thenReturn(Optional.of(creator));
+        // First code exists, second does not
+        when(houseRepository.findByInviteCode(anyString()))
+                .thenReturn(Optional.of(new House()))
+                .thenReturn(Optional.empty());
+
+        when(houseRepository.save(any(House.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(houseMemberRepository.save(any(HouseMember.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        House savedHouse = houseService.createHouse(request);
+        assertNotNull(savedHouse);
+        verify(houseRepository, times(2)).findByInviteCode(anyString());
+    }
+}

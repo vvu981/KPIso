@@ -260,4 +260,100 @@ class DirectPaymentServiceTest {
 
         assertEquals("No se puede eliminar un pago liquidado", ex.getMessage());
     }
+
+    @Test
+    void deleteDirectPaymentShouldFailWhenNotOwner() {
+        DirectPayment dp = DirectPayment.builder()
+                .id(UUID.randomUUID())
+                .sender(sender)
+                .recipient(recipient)
+                .amount(new BigDecimal("15.50"))
+                .house(house)
+                .settled(false)
+                .build();
+
+        when(directPaymentRepository.findById(dp.getId())).thenReturn(Optional.of(dp));
+        when(userRepository.findById(recipient.getId())).thenReturn(Optional.of(recipient));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> directPaymentService.deleteDirectPayment(dp.getId(), recipient.getId()));
+
+        assertEquals("Acceso denegado: No eres el emisor de este pago", ex.getMessage());
+    }
+
+    @Test
+    void createDirectPaymentShouldFailWhenSenderNotFound() {
+        CreateDirectPaymentRequest request = CreateDirectPaymentRequest.builder()
+                .senderId(sender.getId())
+                .recipientId(recipient.getId())
+                .houseId(house.getId())
+                .build();
+        when(houseRepository.findById(house.getId())).thenReturn(Optional.of(house));
+        when(userRepository.findById(sender.getId())).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class, () -> directPaymentService.createDirectPayment(request));
+    }
+
+    @Test
+    void createDirectPaymentShouldFailWhenRecipientNotFound() {
+        CreateDirectPaymentRequest request = CreateDirectPaymentRequest.builder()
+                .senderId(sender.getId())
+                .recipientId(recipient.getId())
+                .houseId(house.getId())
+                .build();
+        when(houseRepository.findById(house.getId())).thenReturn(Optional.of(house));
+        when(userRepository.findById(sender.getId())).thenReturn(Optional.of(sender));
+        when(userRepository.findById(recipient.getId())).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class, () -> directPaymentService.createDirectPayment(request));
+    }
+
+    @Test
+    void updateDirectPaymentShouldFailWhenSenderNotFound() {
+        UUID id = UUID.randomUUID();
+        DirectPayment dp = DirectPayment.builder().id(id).settled(false).build();
+        CreateDirectPaymentRequest request = CreateDirectPaymentRequest.builder().senderId(sender.getId()).build();
+        when(directPaymentRepository.findById(id)).thenReturn(Optional.of(dp));
+        when(userRepository.findById(sender.getId())).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class, () -> directPaymentService.updateDirectPayment(id, request, sender.getId()));
+    }
+
+    @Test
+    void updateDirectPaymentShouldFailWhenRecipientNotFound() {
+        UUID id = UUID.randomUUID();
+        DirectPayment dp = DirectPayment.builder().id(id).settled(false).build();
+        CreateDirectPaymentRequest request = CreateDirectPaymentRequest.builder().senderId(sender.getId()).recipientId(recipient.getId()).build();
+        when(directPaymentRepository.findById(id)).thenReturn(Optional.of(dp));
+        when(userRepository.findById(sender.getId())).thenReturn(Optional.of(sender));
+        when(userRepository.findById(recipient.getId())).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class, () -> directPaymentService.updateDirectPayment(id, request, sender.getId()));
+    }
+
+    @Test
+    void updateDirectPaymentShouldFailWhenPayingSelf() {
+        UUID id = UUID.randomUUID();
+        DirectPayment dp = DirectPayment.builder().id(id).settled(false).build();
+        CreateDirectPaymentRequest request = CreateDirectPaymentRequest.builder().senderId(sender.getId()).recipientId(sender.getId()).build();
+        when(directPaymentRepository.findById(id)).thenReturn(Optional.of(dp));
+        when(userRepository.findById(sender.getId())).thenReturn(Optional.of(sender));
+
+        assertThrows(IllegalArgumentException.class, () -> directPaymentService.updateDirectPayment(id, request, sender.getId()));
+    }
+
+    @Test
+    void updateDirectPaymentShouldFailWhenModifierNotFound() {
+        UUID id = UUID.randomUUID();
+        UUID randomUserId = UUID.randomUUID();
+        DirectPayment dp = DirectPayment.builder().id(id).settled(false).build();
+        CreateDirectPaymentRequest request = CreateDirectPaymentRequest.builder().senderId(sender.getId()).recipientId(recipient.getId()).build();
+        when(directPaymentRepository.findById(id)).thenReturn(Optional.of(dp));
+        when(userRepository.findById(sender.getId())).thenReturn(Optional.of(sender));
+        when(userRepository.findById(recipient.getId())).thenReturn(Optional.of(recipient));
+        when(userRepository.findById(randomUserId)).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class, () -> directPaymentService.updateDirectPayment(id, request, randomUserId));
+    }
 }
+
