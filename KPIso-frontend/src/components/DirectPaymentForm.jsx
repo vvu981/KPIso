@@ -6,10 +6,10 @@ import { Input } from './ui/Input.jsx';
 import { Alert } from './ui/Alert.jsx';
 import { IconBanknotes } from './ui/Icons.jsx';
 
-export default function DirectPaymentForm({ house, onClose, onSuccess, currentUserId }) {
-    const [senderId, setSenderId] = useState(currentUserId || '');
-    const [recipientId, setRecipientId] = useState('');
-    const [amount, setAmount] = useState('');
+export default function DirectPaymentForm({ house, onClose, onSuccess, currentUserId, payment }) {
+    const [senderId, setSenderId] = useState(payment ? payment.senderId : (currentUserId || ''));
+    const [recipientId, setRecipientId] = useState(payment ? payment.recipientId : '');
+    const [amount, setAmount] = useState(payment ? payment.amount.toString() : '');
     const [error, setError] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
@@ -35,16 +35,25 @@ export default function DirectPaymentForm({ house, onClose, onSuccess, currentUs
 
         setSubmitting(true);
         try {
-            await api.post('/direct-payments', {
-                senderId,
-                recipientId,
-                amount: parsedAmount,
-                houseId: house.id,
-            });
+            if (payment) {
+                await api.put(`/direct-payments/${payment.id}?userId=${currentUserId}`, {
+                    senderId,
+                    recipientId,
+                    amount: parsedAmount,
+                    houseId: house.id,
+                });
+            } else {
+                await api.post('/direct-payments', {
+                    senderId,
+                    recipientId,
+                    amount: parsedAmount,
+                    houseId: house.id,
+                });
+            }
             onSuccess();
             onClose();
         } catch (err) {
-            setError(err.response?.data?.message || 'Error al registrar el pago directo');
+            setError(err.response?.data?.message || `Error al ${payment ? 'actualizar' : 'registrar'} el pago directo`);
         } finally {
             setSubmitting(false);
         }
@@ -65,7 +74,7 @@ export default function DirectPaymentForm({ house, onClose, onSuccess, currentUs
         >
             <Card padding="lg" style={{ maxWidth: '400px', width: '100%', borderTop: '4px solid var(--success)' }}>
                 <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-bold)', marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <IconBanknotes style={{ color: 'var(--success)' }} /> Registrar Pago Directo / Bizum
+                    <IconBanknotes style={{ color: 'var(--success)' }} /> {payment ? 'Editar Pago Directo / Bizum' : 'Registrar Pago Directo / Bizum'}
                 </h2>
 
                 {error && <Alert type="error" message={error} style={{ marginBottom: 'var(--space-3)' }} />}
@@ -144,7 +153,7 @@ export default function DirectPaymentForm({ house, onClose, onSuccess, currentUs
                             Cancelar
                         </Button>
                         <Button variant="primary" size="md" type="submit" disabled={submitting} full>
-                            {submitting ? 'Registrando...' : 'Confirmar Bizum'}
+                            {submitting ? (payment ? 'Guardando...' : 'Registrando...') : (payment ? 'Guardar Cambios' : 'Confirmar Bizum')}
                         </Button>
                     </div>
                 </form>

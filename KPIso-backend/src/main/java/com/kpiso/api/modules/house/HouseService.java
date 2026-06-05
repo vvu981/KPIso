@@ -7,6 +7,8 @@ import com.kpiso.api.modules.user.User;
 import com.kpiso.api.modules.user.UserRepository;
 import com.kpiso.api.modules.expense.Expense;
 import com.kpiso.api.modules.expense.ExpenseRepository;
+import com.kpiso.api.modules.expense.DirectPayment;
+import com.kpiso.api.modules.expense.DirectPaymentRepository;
 import com.kpiso.api.modules.activity.ActivityLogService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,17 +31,20 @@ public class HouseService {
         private final UserRepository userRepository;
         private final ActivityLogService activityLogService;
         private final ExpenseRepository expenseRepository; // Inyectado para validar saldos antes de expulsiones
+        private final DirectPaymentRepository directPaymentRepository;
 
         public HouseService(HouseRepository houseRepository,
                         HouseMemberRepository houseMemberRepository,
                         UserRepository userRepository,
                         ActivityLogService activityLogService,
-                        ExpenseRepository expenseRepository) {
+                        ExpenseRepository expenseRepository,
+                        DirectPaymentRepository directPaymentRepository) {
                 this.houseRepository = houseRepository;
                 this.houseMemberRepository = houseMemberRepository;
                 this.userRepository = userRepository;
                 this.activityLogService = activityLogService;
                 this.expenseRepository = expenseRepository;
+                this.directPaymentRepository = directPaymentRepository;
         }
 
         @Transactional
@@ -273,6 +278,16 @@ public class HouseService {
 
                         if (splits.containsKey(targetUserId)) {
                                 targetBalance = targetBalance.subtract(splits.get(targetUserId));
+                        }
+                }
+
+                List<DirectPayment> directPayments = directPaymentRepository.findByHouseIdAndSettledFalse(houseId);
+                for (DirectPayment dp : directPayments) {
+                        if (dp.getSender().getId().equals(targetUserId)) {
+                                targetBalance = targetBalance.add(dp.getAmount());
+                        }
+                        if (dp.getRecipient().getId().equals(targetUserId)) {
+                                targetBalance = targetBalance.subtract(dp.getAmount());
                         }
                 }
 

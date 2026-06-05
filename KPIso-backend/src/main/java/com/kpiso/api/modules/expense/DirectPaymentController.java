@@ -28,4 +28,24 @@ public class DirectPaymentController {
     public ResponseEntity<List<DirectPaymentResponse>> getHouseDirectPayments(@PathVariable UUID houseId) {
         return ResponseEntity.ok(directPaymentService.getHouseDirectPayments(houseId));
     }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<DirectPaymentResponse> updateDirectPayment(
+            @PathVariable UUID id,
+            @Valid @RequestBody CreateDirectPaymentRequest request,
+            @RequestParam UUID userId) {
+        return ResponseEntity.ok(directPaymentService.updateDirectPayment(id, request, userId));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteDirectPayment(
+            @PathVariable UUID id,
+            @RequestParam UUID userId) {
+        try {
+            directPaymentService.deleteDirectPayment(id, userId);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
 }

@@ -3,6 +3,8 @@ package com.kpiso.api.modules.house;
 import com.kpiso.api.modules.activity.ActivityLogService;
 import com.kpiso.api.modules.expense.Expense;
 import com.kpiso.api.modules.expense.ExpenseRepository;
+import com.kpiso.api.modules.expense.DirectPayment;
+import com.kpiso.api.modules.expense.DirectPaymentRepository;
 import com.kpiso.api.modules.house.dto.CreateHouseRequest;
 import com.kpiso.api.modules.house.dto.HouseDetailResponse;
 import com.kpiso.api.modules.house.dto.UserHouseResponse;
@@ -44,6 +46,9 @@ class HouseServiceTest {
     @Mock
     private ExpenseRepository expenseRepository;
 
+    @Mock
+    private DirectPaymentRepository directPaymentRepository;
+
     private HouseService houseService;
 
     private User creator;
@@ -60,7 +65,7 @@ class HouseServiceTest {
             public void log(String description, String actionType, House house, User user) {
             }
         };
-        houseService = new HouseService(houseRepository, houseMemberRepository, userRepository, activityLogService, expenseRepository);
+        houseService = new HouseService(houseRepository, houseMemberRepository, userRepository, activityLogService, expenseRepository, directPaymentRepository);
     }
 
     @Test
@@ -328,6 +333,7 @@ class HouseServiceTest {
         when(houseMemberRepository.findByHouseIdAndUserId(house.getId(), creator.getId())).thenReturn(Optional.of(requester));
         when(houseMemberRepository.findByHouseIdAndUserId(house.getId(), guest.getId())).thenReturn(Optional.of(targetMember));
         when(expenseRepository.findByHouseIdAndSettledFalse(house.getId())).thenReturn(List.of());
+        when(directPaymentRepository.findByHouseIdAndSettledFalse(house.getId())).thenReturn(List.of());
 
         houseService.removeMember(house.getId(), guest.getId(), creator.getId());
 
@@ -354,6 +360,7 @@ class HouseServiceTest {
         when(userRepository.findById(guest.getId())).thenReturn(Optional.of(guest));
         when(houseMemberRepository.findByHouseIdAndUserId(house.getId(), creator.getId())).thenReturn(Optional.of(requester));
         when(expenseRepository.findByHouseIdAndSettledFalse(house.getId())).thenReturn(List.of(expense));
+        when(directPaymentRepository.findByHouseIdAndSettledFalse(house.getId())).thenReturn(List.of());
 
         IllegalStateException exception = assertThrows(IllegalStateException.class, () -> houseService.removeMember(house.getId(), guest.getId(), creator.getId()));
 
@@ -381,6 +388,7 @@ class HouseServiceTest {
         when(houseMemberRepository.findByHouseIdAndUserId(house.getId(), creator.getId())).thenReturn(Optional.of(requester));
         when(houseMemberRepository.findByHouseIdAndUserId(house.getId(), guest.getId())).thenReturn(Optional.of(targetMember));
         when(expenseRepository.findByHouseIdAndSettledFalse(house.getId())).thenReturn(List.of(expense));
+        when(directPaymentRepository.findByHouseIdAndSettledFalse(house.getId())).thenReturn(List.of());
 
         houseService.removeMember(house.getId(), guest.getId(), creator.getId());
 

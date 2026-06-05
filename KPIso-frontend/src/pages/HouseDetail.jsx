@@ -19,56 +19,56 @@ import {
 // ── SVG Icons (Heroicons outline) ───────────────────────────────────────
 const IconPencil = () => (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
     </svg>
 );
 const IconTrash = () => (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <polyline points="3 6 5 6 21 6"/>
-        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-        <path d="M10 11v6M14 11v6"/>
-        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+        <polyline points="3 6 5 6 21 6" />
+        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+        <path d="M10 11v6M14 11v6" />
+        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
     </svg>
 );
 const IconClipboard = () => (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
-        <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+        <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+        <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
     </svg>
 );
 const IconCurrencyEuro = () => (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <circle cx="12" cy="12" r="10"/>
+        <circle cx="12" cy="12" r="10" />
         <text x="7" y="17" fontFamily="serif" fontSize="14" fill="currentColor" stroke="none">€</text>
     </svg>
 );
 const IconShield = () => (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
     </svg>
 );
 const IconUsers = () => (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-        <circle cx="9" cy="7" r="4"/>
-        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
     </svg>
 );
 const IconStar = () => (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
     </svg>
 );
 const IconX = () => (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
     </svg>
 );
 const IconChevronLeft = () => (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <polyline points="15 18 9 12 15 6"/>
+        <polyline points="15 18 9 12 15 6" />
     </svg>
 );
 
@@ -87,13 +87,15 @@ export default function HouseDetail() {
     const [expenses, setExpenses] = useState([]);
     const [settlements, setSettlements] = useState([]);
     const [memberStatuses, setMemberStatuses] = useState({});
+    const [directPayments, setDirectPayments] = useState([]);
+    const [editingPayment, setEditingPayment] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
     // Estado de UI
     const [activeTab, setActiveTab] = useState('tasks');
     const [taskViewMode, setTaskViewMode] = useState('list');
-    const [sidebarView, setSidebarView] = useState('money');
+    const [sidebarView, setSidebarView] = useState('points');
     const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
     const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
     const [selectedTask, setSelectedTask] = useState(null);
@@ -152,12 +154,13 @@ export default function HouseDetail() {
      */
     const fetchData = async () => {
         try {
-            const [houseRes, tasksRes, expensesRes, settlementRes, statusRes] = await Promise.all([
+            const [houseRes, tasksRes, expensesRes, settlementRes, statusRes, directPaymentsRes] = await Promise.all([
                 api.get(`/houses/${houseId}?userId=${currentUserId}`),
                 api.get(`/tasks/house/${houseId}`),
                 api.get(`/expenses/house/${houseId}`),
                 api.get(`/expenses/house/${houseId}/settlement`),
                 api.get(`/expenses/house/${houseId}/statuses`),
+                api.get(`/direct-payments/house/${houseId}`),
             ]);
 
             setHouse(houseRes.data);
@@ -165,6 +168,7 @@ export default function HouseDetail() {
             setExpenses(expensesRes.data);
             setSettlements(settlementRes.data);
             setMemberStatuses(statusRes.data);
+            setDirectPayments(directPaymentsRes.data);
         } catch (err) {
             if (err.response?.status === 403) {
                 setError('Acceso denegado: No eres miembro participante ni tienes acceso autorizado a esta vivienda.');
@@ -381,12 +385,11 @@ export default function HouseDetail() {
             `¿Confirmas que ${debtorUsername} ha pagado ${amount.toFixed(2)}€ a ${creditorUsername}?`,
             async () => {
                 try {
-                    await api.post('/expenses', {
-                        title: `Liquidación: ${debtorUsername} ➔ ${creditorUsername}`,
+                    await api.post('/direct-payments', {
+                        senderId: debtorId,
+                        recipientId: creditorId,
                         amount: parseFloat(amount),
                         houseId,
-                        paidById: debtorId,
-                        participantIds: [creditorId]
                     });
                     fetchData();
                 } catch (err) {
@@ -419,6 +422,27 @@ export default function HouseDetail() {
             },
             'Liquidar Cuentas'
         );
+    };
+
+    // Handlers para pagos directos (Bizum)
+    const handleDeleteDirectPayment = async (paymentId) => {
+        showConfirm(
+            '¿Confirmas la eliminación definitiva de este pago directo?',
+            async () => {
+                try {
+                    await api.delete(`/direct-payments/${paymentId}?userId=${currentUserId}`);
+                    fetchData();
+                } catch (err) {
+                    showAlert('No se pudo eliminar el pago directo.');
+                }
+            },
+            'Eliminar Gasto/Pago'
+        );
+    };
+
+    const startEditDirectPayment = (payment) => {
+        setEditingPayment(payment);
+        setShowDirectPaymentModal(true);
     };
 
     // Handlers para vivienda
@@ -609,6 +633,9 @@ export default function HouseDetail() {
                             isAdmin={selfIsAdmin}
                             allApproved={house.members.every(m => m.settleApproved)}
                             onSettleAll={handleSettleAll}
+                            directPayments={directPayments}
+                            onEditDirectPayment={startEditDirectPayment}
+                            onDeleteDirectPayment={handleDeleteDirectPayment}
                         />
                     )}
 
@@ -652,7 +679,11 @@ export default function HouseDetail() {
                 <DirectPaymentForm
                     house={house}
                     currentUserId={currentUserId}
-                    onClose={() => setShowDirectPaymentModal(false)}
+                    payment={editingPayment}
+                    onClose={() => {
+                        setShowDirectPaymentModal(false);
+                        setEditingPayment(null);
+                    }}
                     onSuccess={fetchData}
                 />
             )}
@@ -829,19 +860,19 @@ function HouseDetailHeader({ house, activeTab, onTabChange, onEditClick, onDelet
  * HouseSidebar — Panel lateral con miembros e información
  */
 function HouseSidebar({
-                          members,
-                          memberStatuses,
-                          sidebarView,
-                          onSidebarViewChange,
-                          onRemoveMember,
-                          currentUserId,
-                          isAdmin,
-                          onColorChange,
-                          onEditProfile,
-                          isReadOnly,
-                          onRegisterDirectPayment,
-                          onToggleSettleApproval,
-                      }) {
+    members,
+    memberStatuses,
+    sidebarView,
+    onSidebarViewChange,
+    onRemoveMember,
+    currentUserId,
+    isAdmin,
+    onColorChange,
+    onEditProfile,
+    isReadOnly,
+    onRegisterDirectPayment,
+    onToggleSettleApproval,
+}) {
     return (
         <Card padding="lg" glass>
             <h2 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-bold)', color: 'var(--text-secondary)', marginBottom: 'var(--space-3)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
@@ -849,7 +880,7 @@ function HouseSidebar({
             </h2>
 
             <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
-                {['money', 'points'].map((view) => (
+                {['points', 'money'].map((view) => (
                     <button
                         key={view}
                         onClick={() => onSidebarViewChange(view)}
@@ -869,19 +900,19 @@ function HouseSidebar({
                             transition: 'all 200ms var(--timing-smooth)',
                         }}
                     >
-                        {view === 'money' ? <><IconCurrencyEuro /> Balance</> : <><IconStar /> Puntos</>}
+                        {view === 'points' ? <><IconStar /> Puntos</> : <><IconCurrencyEuro /> Balance</>}
                     </button>
                 ))}
             </div>
 
             {sidebarView === 'money' && (
-                <div style={{ 
-                    marginBottom: 'var(--space-4)', 
-                    padding: 'var(--space-3)', 
-                    borderRadius: 'var(--radius-lg)', 
-                    backgroundColor: 'rgba(16, 185, 129, 0.08)', 
-                    border: '1px solid rgba(16, 185, 129, 0.2)', 
-                    fontSize: '11px', 
+                <div style={{
+                    marginBottom: 'var(--space-4)',
+                    padding: 'var(--space-3)',
+                    borderRadius: 'var(--radius-lg)',
+                    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                    border: '1px solid rgba(16, 185, 129, 0.2)',
+                    fontSize: '11px',
                     color: 'var(--text-secondary)',
                     lineHeight: '1.4'
                 }}>
@@ -964,7 +995,7 @@ function HouseSidebar({
                                             onChange={(e) => onColorChange(e.target.value)}
                                             style={{ width: 18, height: 18, border: 'none', borderRadius: '4px', cursor: 'pointer', backgroundColor: 'transparent' }}
                                         />
-                                        
+
                                     </div>
                                 )}
                                 {isAdmin && member.userId !== currentUserId && !isReadOnly && (
@@ -984,7 +1015,7 @@ function HouseSidebar({
                 })}
             </div>
 
-            {!isReadOnly && (
+            {!isReadOnly && sidebarView === 'money' && (
                 <div style={{ marginTop: 'var(--space-4)' }}>
                     <Button
                         variant="secondary"
@@ -1013,32 +1044,32 @@ function HouseSidebar({
  * TasksSection — Sección de gestión de deberes/tareas
  */
 function TasksSection({
-                          tasks,
-                          house,
-                          showTaskForm,
-                          editingTaskId,
-                          taskForm,
-                          onTaskFormChange,
-                          onSubmitTask,
-                          onCancelTask,
-                          onAddTask,
-                          onEditTask,
-                          onDeleteTask,
-                          onToggleStatus,
-                          onDragStart,
-                          onDropTask,
-                          selectedTask,
-                          onSelectTask,
-                          taskViewMode,
-                          onTaskViewModeChange,
-                          currentMonth,
-                          currentYear,
-                          onPrevMonth,
-                          onNextMonth,
-                          selectedUserFilter,
-                          onUserFilterChange,
-                          isReadOnly,
-                      }) {
+    tasks,
+    house,
+    showTaskForm,
+    editingTaskId,
+    taskForm,
+    onTaskFormChange,
+    onSubmitTask,
+    onCancelTask,
+    onAddTask,
+    onEditTask,
+    onDeleteTask,
+    onToggleStatus,
+    onDragStart,
+    onDropTask,
+    selectedTask,
+    onSelectTask,
+    taskViewMode,
+    onTaskViewModeChange,
+    currentMonth,
+    currentYear,
+    onPrevMonth,
+    onNextMonth,
+    selectedUserFilter,
+    onUserFilterChange,
+    isReadOnly,
+}) {
     const now = new Date();
 
     const isTaskInCurrentPeriod = (task) => {
@@ -1475,22 +1506,25 @@ function TaskForm({ form, onFormChange, onSubmit, onCancel, isEditing, house }) 
  * ExpensesSection — Sección de gestión de gastos
  */
 function ExpensesSection({
-                             expenses,
-                             settlements,
-                             memberStatuses,
-                             house,
-                             showExpenseForm,
-                             expenseForm,
-                             onSubmitExpense,
-                             onCancelExpense,
-                             onAddExpense,
-                             onSettlePayment,
-                             setExpenseForm,
-                             currentUserId,
-                             isAdmin,
-                             allApproved,
-                             onSettleAll,
-                         }) {
+    expenses,
+    settlements,
+    memberStatuses,
+    house,
+    showExpenseForm,
+    expenseForm,
+    onSubmitExpense,
+    onCancelExpense,
+    onAddExpense,
+    onSettlePayment,
+    setExpenseForm,
+    currentUserId,
+    isAdmin,
+    allApproved,
+    onSettleAll,
+    directPayments = [],
+    onEditDirectPayment,
+    onDeleteDirectPayment,
+}) {
     const toggleBeneficiary = (id) => {
         const updated = expenseForm.participantIds.includes(id)
             ? expenseForm.participantIds.filter(p => p !== id)
@@ -1530,9 +1564,9 @@ function ExpensesSection({
                     >
                         <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M18 3L6 15"/>
-                                <path d="M9 18l3 3 6-6-3-3-6 6z"/>
-                                <path d="M3 21h3"/>
+                                <path d="M18 3L6 15" />
+                                <path d="M9 18l3 3 6-6-3-3-6 6z" />
+                                <path d="M3 21h3" />
                             </svg>
                             {allApproved ? 'Liquidar Cuentas del Piso (Consenso Listo)' : 'Liquidar Cuentas del Piso (Falta Consenso)'}
                         </span>
@@ -1602,42 +1636,114 @@ function ExpensesSection({
                 </div>
             )}
 
-            {expenses.length === 0 && !showExpenseForm ? (
-                <div style={{ textAlign: 'center', padding: 'var(--space-8)' }}>
-                    <p style={{ color: 'var(--text-tertiary)' }}>
-                        No hay gastos registrados.
-                    </p>
-                </div>
-            ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                    {expenses.map((expense) => (
-                        <div
-                            key={expense.id}
-                            style={{
-                                padding: 'var(--space-4)',
-                                borderRadius: 'var(--radius-lg)',
-                                backgroundColor: 'var(--bg-elevated)',
-                                border: '1px solid var(--border-subtle)',
-                                borderLeft: '4px solid var(--success)',
-                            }}
-                        >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div>
-                                    <h4 style={{ fontWeight: 'var(--font-bold)', fontSize: 'var(--text-sm)' }}>
-                                        {expense.title}
-                                    </h4>
-                                    <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                                        Puso: <strong>{expense.paidByUsername}</strong> | Para: {expense.participantUsernames?.join(', ')}
-                                    </p>
+            <div>
+                <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-bold)', color: 'var(--text-secondary)', marginBottom: 'var(--space-3)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    Facturas y Gastos Compartidos
+                </h3>
+                {expenses.length === 0 && !showExpenseForm ? (
+                    <div style={{ textAlign: 'center', padding: 'var(--space-6)', backgroundColor: 'var(--bg-elevated)', borderRadius: 'var(--radius-lg)', border: '1px dashed var(--border-subtle)', marginBottom: 'var(--space-6)' }}>
+                        <p style={{ color: 'var(--text-tertiary)', margin: 0, fontSize: 'var(--text-sm)' }}>
+                            No hay gastos registrados.
+                        </p>
+                    </div>
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginBottom: 'var(--space-6)' }}>
+                        {expenses.map((expense) => (
+                            <div
+                                key={expense.id}
+                                style={{
+                                    padding: 'var(--space-4)',
+                                    borderRadius: 'var(--radius-lg)',
+                                    backgroundColor: 'var(--bg-elevated)',
+                                    border: '1px solid var(--border-subtle)',
+                                    borderLeft: '4px solid var(--success)',
+                                }}
+                            >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                        <h4 style={{ fontWeight: 'var(--font-bold)', fontSize: 'var(--text-sm)' }}>
+                                            {expense.title}
+                                        </h4>
+                                        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                            Puso: <strong>{expense.paidByUsername}</strong> | Para: {expense.participantUsernames?.join(', ')}
+                                        </p>
+                                    </div>
+                                    <span style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-black)', color: 'var(--text-primary)' }}>
+                                        {expense.amount.toFixed(2)}€
+                                    </span>
                                 </div>
-                                <span style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-black)', color: 'var(--text-primary)' }}>
-                                    {expense.amount.toFixed(2)}€
-                                </span>
                             </div>
-                        </div>
-                    ))}
-                </div>
-            )}
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 'var(--space-5)', marginTop: 'var(--space-5)' }}>
+                <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-bold)', color: 'var(--text-secondary)', marginBottom: 'var(--space-3)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <IconBanknotes /> Pagos Directos / Bizum Registrados
+                </h3>
+                {directPayments.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: 'var(--space-6)', backgroundColor: 'var(--bg-elevated)', borderRadius: 'var(--radius-lg)', border: '1px dashed var(--border-subtle)' }}>
+                        <p style={{ color: 'var(--text-tertiary)', margin: 0, fontSize: 'var(--text-sm)' }}>
+                            No hay pagos directos registrados.
+                        </p>
+                    </div>
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                        {directPayments.map((payment) => {
+                            const isOwner = payment.senderId === currentUserId;
+                            return (
+                                <div
+                                    key={payment.id}
+                                    style={{
+                                        padding: 'var(--space-4)',
+                                        borderRadius: 'var(--radius-lg)',
+                                        backgroundColor: 'var(--bg-elevated)',
+                                        border: '1px solid var(--border-subtle)',
+                                        borderLeft: '4px solid #10b981',
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div>
+                                            <h4 style={{ fontWeight: 'var(--font-bold)', fontSize: 'var(--text-sm)', color: '#10b981' }}>
+                                                Bizum / Pago Directo
+                                            </h4>
+                                            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                                Emisor: <strong>{payment.senderUsername}</strong> ➔ Receptor: <strong>{payment.recipientUsername}</strong>
+                                            </p>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+                                            <span style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-black)', color: 'var(--text-primary)' }}>
+                                                {payment.amount.toFixed(2)}€
+                                            </span>
+                                            {isOwner && !payment.settled && !house.isReadOnly && (
+                                                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                                                    <Button
+                                                        variant="secondary"
+                                                        size="xs"
+                                                        onClick={() => onEditDirectPayment(payment)}
+                                                        title="Editar pago"
+                                                    >
+                                                        Editar
+                                                    </Button>
+                                                    <Button
+                                                        variant="danger"
+                                                        size="xs"
+                                                        onClick={() => onDeleteDirectPayment(payment.id)}
+                                                        title="Eliminar pago"
+                                                    >
+                                                        Eliminar
+                                                    </Button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
         </Card>
     );
 }
@@ -1648,7 +1754,7 @@ function ExpensesSection({
 function HistorySection({ houseId }) {
     const authContext = useContext(AuthContext);
     const { token } = authContext || {};
-    
+
     const [logs, setLogs] = useState([]);
     const [page, setPage] = useState(0);
     const [hasMore, setHasMore] = useState(true);
@@ -1659,16 +1765,16 @@ function HistorySection({ houseId }) {
         if (!houseId) return;
         setLoading(true);
         setError(null);
-        
+
         try {
             const response = await api.get(`/activity/house/${houseId}?page=${pageNumber}&size=20`, {
                 headers: token ? { Authorization: `Bearer ${token}` } : {}
             });
-            
+
             const newLogs = response.data.content || [];
-            
+
             setLogs(prev => isInitial ? newLogs : [...prev, ...newLogs]);
-            setHasMore(!response.data.last); 
+            setHasMore(!response.data.last);
             setPage(pageNumber);
         } catch (err) {
             console.error('Error al cargar la actividad:', err);
@@ -1725,8 +1831,8 @@ function HistorySection({ houseId }) {
 
             {hasMore && (
                 <div style={{ marginTop: 'var(--space-4)', textAlign: 'center' }}>
-                    <Button 
-                        variant="secondary" 
+                    <Button
+                        variant="secondary"
                         onClick={() => loadLogs(page + 1)}
                         disabled={loading}
                     >

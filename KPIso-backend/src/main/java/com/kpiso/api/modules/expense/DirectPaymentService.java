@@ -83,4 +83,66 @@ public class DirectPaymentService {
                 .createdAt(payment.getCreatedAt())
                 .build();
     }
+
+    @Transactional
+    public DirectPaymentResponse updateDirectPayment(UUID paymentId, CreateDirectPaymentRequest request, UUID requestingUserId) {
+        DirectPayment payment = directPaymentRepository.findById(paymentId)
+                .orElseThrow(() -> new IllegalArgumentException("El pago no existe"));
+
+        if (payment.isSettled()) {
+            throw new IllegalStateException("No se puede editar un pago liquidado");
+        }
+
+        User sender = userRepository.findById(request.getSenderId())
+                .orElseThrow(() -> new IllegalArgumentException("El usuario emisor no existe"));
+
+        User recipient = userRepository.findById(request.getRecipientId())
+                .orElseThrow(() -> new IllegalArgumentException("El usuario receptor no existe"));
+
+        if (sender.getId().equals(recipient.getId())) {
+            throw new IllegalArgumentException("No puedes realizar un pago a ti mismo");
+        }
+
+        User modifier = userRepository.findById(requestingUserId)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario solicitante no existe"));
+
+        if (!payment.getSender().getId().equals(requestingUserId)) {
+            throw new IllegalArgumentException("Acceso denegado: No eres el emisor de este pago");
+        }
+
+        payment.setSender(sender);
+        payment.setRecipient(recipient);
+        payment.setAmount(request.getAmount());
+
+        DirectPayment updated = directPaymentRepository.save(payment);
+
+        String msg = String.format("%s actualizó un pago directo (Bizum) de %s€ a %s",
+                modifier.getUsername(), updated.getAmount(), recipient.getUsername());
+        activityLogService.log(msg, "PAYMENT", payment.getHouse(), modifier);
+
+        return mapToResponse(updated);
+    }
+
+    @Transactional
+    public void deleteDirectPayment(UUID paymentId, UUID requestingUserId) {
+        DirectPayment payment = directPaymentRepository.findById(paymentId)
+                .orElseThrow(() -> new IllegalArgumentException("El pago no existe"));
+
+        if (payment.isSettled()) {
+            throw new IllegalStateException("No se puede eliminar un pago liquidado");
+        }
+
+        User terminator = userRepository.findById(requestingUserId)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario solicitante no existe"));
+
+        if (!payment.getSender().getId().equals(requestingUserId)) {
+            throw new IllegalArgumentException("Acceso denegado: No eres el emisor de este pago");
+        }
+
+        String msg = String.format("%s eliminó un pago directo (Bizum) de %s€ a %s",
+                terminator.getUsername(), payment.getAmount(), payment.getRecipient().getUsername());
+        activityLogService.log(msg, "PAYMENT", payment.getHouse(), terminator);
+
+        directPaymentRepository.delete(payment);
+    }
 }
