@@ -24,4 +24,5 @@ public class ShoppingItemResponse {
     private java.util.List<UUID> assignedUserIds;
     private LocalDateTime updatedAt;
     private UUID checkoutId;
+    private Integer quantity;
 }

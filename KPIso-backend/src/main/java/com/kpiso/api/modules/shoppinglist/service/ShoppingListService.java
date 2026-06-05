@@ -153,6 +153,7 @@ public class ShoppingListService {
                 .imageUrl(imageUrl)
                 .status(ShoppingItemStatus.PENDING)
                 .assignedUsers(request.getAssignedUserIds() != null ? request.getAssignedUserIds() : new ArrayList<>())
+                .quantity(request.getQuantity() != null ? request.getQuantity() : 1)
                 .build();
 
         ShoppingItem savedItem = shoppingItemRepository.save(item);
@@ -311,6 +312,7 @@ public class ShoppingListService {
                 .assignedUserIds(item.getAssignedUsers())
                 .checkoutId(item.getCheckoutId())
                 .updatedAt(item.getUpdatedAt())
+                .quantity(item.getQuantity())
                 .build();
     }
 

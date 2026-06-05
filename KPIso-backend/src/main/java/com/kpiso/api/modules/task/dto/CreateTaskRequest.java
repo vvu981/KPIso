@@ -42,4 +42,6 @@ public class CreateTaskRequest {
     private Integer occurrencesToProject; // El campo que le faltaba a tu servicio
 
     private LocalDateTime startDate;
+
+    private UUID firstResponsibleId;
 }

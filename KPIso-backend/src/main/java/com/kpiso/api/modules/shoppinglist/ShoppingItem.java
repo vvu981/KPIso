@@ -51,6 +51,9 @@ public class ShoppingItem {
     @Column(name = "checkout_id")
     private UUID checkoutId;
 
+    @Column(name = "quantity")
+    private Integer quantity;
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "shopping_item_assigned_users", joinColumns = @JoinColumn(name = "shopping_item_id"))
     @Column(name = "user_id")

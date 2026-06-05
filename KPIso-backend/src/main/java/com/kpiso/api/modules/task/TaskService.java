@@ -45,6 +45,7 @@ public class TaskService {
 
         List<Task> createdTasks = new ArrayList<>();
         LocalDateTime currentDate = request.getStartDate() != null ? request.getStartDate() : LocalDateTime.now();
+        currentDate = currentDate.with(java.time.LocalTime.MAX);
 
         if (request.getRotationType() == RotationType.FIXED) {
             if (request.getAssignedToId() == null) {
@@ -126,6 +127,27 @@ public class TaskService {
 
             if (participants.isEmpty()) {
                 throw new IllegalArgumentException("No se pueden crear tareas rotativas sin participantes");
+            }
+
+            // Si se proporciona un primer responsable, reordenamos la lista en memoria situándolo en la posición 0
+            if (request.getFirstResponsibleId() != null) {
+                int firstIndex = -1;
+                for (int j = 0; j < participants.size(); j++) {
+                    if (participants.get(j).getId().equals(request.getFirstResponsibleId())) {
+                        firstIndex = j;
+                        break;
+                    }
+                }
+                if (firstIndex != -1) {
+                    List<User> reordered = new ArrayList<>();
+                    for (int j = firstIndex; j < participants.size(); j++) {
+                        reordered.add(participants.get(j));
+                    }
+                    for (int j = 0; j < firstIndex; j++) {
+                        reordered.add(participants.get(j));
+                    }
+                    participants = reordered;
+                }
             }
 
             // Crear tareas y encadenarlas

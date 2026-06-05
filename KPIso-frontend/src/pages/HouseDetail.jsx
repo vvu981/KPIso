@@ -13,8 +13,9 @@ import DirectPaymentForm from '../components/DirectPaymentForm.jsx';
 import {
     IconClipboardDocumentList, IconBanknotes, IconMagnifyingGlass,
     IconCalendar, IconListBullet, IconCheck, IconXMark,
-    IconPlus, IconReceiptRefund
+    IconPlus, IconReceiptRefund, IconChart, IconLifebuoy
 } from '../components/ui/Icons.jsx';
+import HouseStats from './HouseStats.jsx';
 
 // ── SVG Icons (Heroicons outline) ───────────────────────────────────────
 const IconPencil = () => (
@@ -114,6 +115,7 @@ export default function HouseDetail() {
         specificDays: [],
         occurrencesToProject: 4,
         startDate: '',
+        firstResponsibleId: '',
     });
 
     const [showExpenseForm, setShowExpenseForm] = useState(false);
@@ -250,6 +252,9 @@ export default function HouseDetail() {
                 payload.assignedToId = taskForm.assignedToId || currentUserId;
             } else {
                 payload.participantIds = taskForm.participantIds;
+                if (taskForm.firstResponsibleId) {
+                    payload.firstResponsibleId = taskForm.firstResponsibleId;
+                }
                 if (taskForm.rotationType === 'WEEKLY') {
                     payload.specificDays = taskForm.specificDays;
                 }
@@ -272,6 +277,7 @@ export default function HouseDetail() {
                 specificDays: [],
                 occurrencesToProject: 4,
                 startDate: '',
+                firstResponsibleId: '',
             });
             setShowTaskForm(false);
             fetchData();
@@ -339,6 +345,7 @@ export default function HouseDetail() {
             specificDays: [],
             occurrencesToProject: 1,
             startDate: dateIsoBase,
+            firstResponsibleId: '',
         });
         setShowTaskForm(true);
     };
@@ -652,6 +659,11 @@ export default function HouseDetail() {
                     {activeTab === 'history' && (
                         <HistorySection houseId={houseId} />
                     )}
+
+                    {/* Panel de estadísticas */}
+                    {activeTab === 'stats' && (
+                        <HouseStats houseId={houseId} members={house.members} />
+                    )}
                 </section>
             </main>
 
@@ -826,7 +838,7 @@ function HouseDetailHeader({ house, activeTab, onTabChange, onEditClick, onDelet
                     paddingTop: 'var(--space-4)',
                 }}
             >
-                {['tasks', 'expenses', 'shopping', 'history'].map((tab) => (
+                {['tasks', 'expenses', 'shopping', 'history', 'stats'].map((tab) => (
                     <button
                         key={tab}
                         onClick={() => onTabChange(tab)}
@@ -849,6 +861,7 @@ function HouseDetailHeader({ house, activeTab, onTabChange, onEditClick, onDelet
                         {tab === 'expenses' && <><IconCurrencyEuro /> Gastos</>}
                         {tab === 'shopping' && <><IconClipboardDocumentList /> Compra</>}
                         {tab === 'history' && <><IconShield /> Transparencia</>}
+                        {tab === 'stats' && <><IconChart /> Estadísticas</>}
                     </button>
                 ))}
             </div>
@@ -1324,7 +1337,7 @@ function TaskListItem({ task, isExpired, onSelect, onEdit, onDelete, onToggleSta
                                 onToggleStatus();
                             }}
                         >
-                            {task.status === 'PENDING' ? (isExpired ? '⚡ Rescatar' : <><IconCheck /> Hecho</>) : <><IconXMark /> Reabrir</>}
+                            {task.status === 'PENDING' ? (isExpired ? <><IconLifebuoy /> Rescatar</> : <><IconCheck /> Hecho</>) : <><IconXMark /> Reabrir</>}
                         </Button>
                         <Button
                             variant="secondary"
@@ -1459,14 +1472,35 @@ function TaskForm({ form, onFormChange, onSubmit, onCancel, isEditing, house }) 
                                 {house.members.map(m => <option key={m.userId} value={m.userId}>{m.username}</option>)}
                             </select>
                         ) : (
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
-                                {house.members.map(m => (
-                                    <label key={m.userId} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2)', backgroundColor: 'var(--bg-base)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', fontSize: 'var(--text-xs)', cursor: 'pointer' }}>
-                                        <input type="checkbox" checked={form.participantIds.includes(m.userId)} onChange={() => toggleParticipant(m.userId)} />
-                                        <span>{m.username}</span>
-                                    </label>
-                                ))}
-                            </div>
+                            <>
+                                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                                    <Button type="button" size="xs" variant="secondary" onClick={() => onFormChange({ ...form, participantIds: house.members.map(m => m.userId) })}>
+                                        Marcar todos
+                                    </Button>
+                                    <Button type="button" size="xs" variant="secondary" onClick={() => onFormChange({ ...form, participantIds: [] })}>
+                                        Desmarcar todos
+                                    </Button>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
+                                    {house.members.map(m => (
+                                        <label key={m.userId} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2)', backgroundColor: 'var(--bg-base)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', fontSize: 'var(--text-xs)', cursor: 'pointer' }}>
+                                            <input type="checkbox" checked={form.participantIds.includes(m.userId)} onChange={() => toggleParticipant(m.userId)} />
+                                            <span>{m.username}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', marginTop: 'var(--space-2)' }}>
+                                    <label style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-bold)', color: 'var(--text-secondary)' }}>Primera persona responsable</label>
+                                    <select
+                                        value={form.firstResponsibleId || ''}
+                                        onChange={(e) => onFormChange({ ...form, firstResponsibleId: e.target.value })}
+                                        style={{ padding: 'var(--space-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', fontSize: 'var(--text-sm)', backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)' }}
+                                    >
+                                        <option value="">-- Seleccionar primero (opcional) --</option>
+                                        {house.members.map(m => <option key={m.userId} value={m.userId}>{m.username}</option>)}
+                                    </select>
+                                </div>
+                            </>
                         )}
                     </div>
                 </>
@@ -1612,8 +1646,31 @@ function ExpensesSection({
                             />
                         </div>
 
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+                            <label htmlFor="exp-payer" style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-bold)', color: 'var(--text-secondary)' }}>Quién ha pagado</label>
+                            <select
+                                id="exp-payer"
+                                required
+                                value={expenseForm.paidById}
+                                onChange={(e) => setExpenseForm({ ...expenseForm, paidById: e.target.value })}
+                                style={{ padding: 'var(--space-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', fontSize: 'var(--text-sm)', backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)' }}
+                            >
+                                {house.members.map(m => (
+                                    <option key={m.userId} value={m.userId}>{m.username}</option>
+                                ))}
+                            </select>
+                        </div>
+
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                             <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-bold)', color: 'var(--text-secondary)' }}>¿Entre quiénes se divide el gasto? (Beneficiarios)</span>
+                            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                                <Button type="button" size="xs" variant="secondary" onClick={() => setExpenseForm({ ...expenseForm, participantIds: house.members.map(m => m.userId) })}>
+                                    Marcar todos
+                                </Button>
+                                <Button type="button" size="xs" variant="secondary" onClick={() => setExpenseForm({ ...expenseForm, participantIds: [] })}>
+                                    Desmarcar todos
+                                </Button>
+                            </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
                                 {house.members.map(m => (
                                     <label key={m.userId} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2)', backgroundColor: 'var(--bg-base)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', fontSize: 'var(--text-xs)', cursor: 'pointer' }}>

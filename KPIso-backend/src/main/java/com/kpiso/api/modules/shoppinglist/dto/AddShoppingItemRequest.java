@@ -17,4 +17,5 @@ public class AddShoppingItemRequest {
     // Nuevo: permitir sobreescritura manual
     private Double manualPrice;
     private Boolean isManual;
+    private Integer quantity;
 }

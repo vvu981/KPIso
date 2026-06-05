@@ -84,6 +84,7 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
     const [manualMode, setManualMode] = useState(false);
     const [manualName, setManualName] = useState('');
     const [manualPrice, setManualPrice] = useState('');
+    const [manualQuantity, setManualQuantity] = useState(1);
 
     // Estado para el flujo de añadir sugerencia: comprobación de duplicado + cantidad
     const [pendingSuggestion, setPendingSuggestion] = useState(null); // sugerencia seleccionada
@@ -454,7 +455,8 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                 houseId: houseId,
                 addedById: currentUserId,
                 assignedUserIds: [],
-                isManual: manualMode
+                isManual: manualMode,
+                quantity: manualMode ? parseInt(manualQuantity || 1, 10) : 1
             };
             if (manualMode && manualPrice && !isNaN(parseFloat(manualPrice))) {
                 payload.manualPrice = parseFloat(manualPrice);
@@ -471,6 +473,7 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
             setProductInput('');
             setManualName('');
             setManualPrice('');
+            setManualQuantity(1);
             setManualMode(false);
             setSuccess(`Producto añadido a la lista`);
             setTimeout(() => setSuccess(null), 3000);
@@ -1006,14 +1009,24 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
                                             disabled={loading}
                                         />
                                     </div>
-                                    <div style={{ width: '180px' }}>
+                                    <div style={{ width: '130px' }}>
                                         <Input
                                             type="number"
                                             step="0.01"
                                             min="0"
-                                            placeholder="Precio (€) opcional"
+                                            placeholder="Precio (€)"
                                             value={manualPrice}
                                             onChange={(e) => setManualPrice(e.target.value)}
+                                            disabled={loading}
+                                        />
+                                    </div>
+                                    <div style={{ width: '90px' }}>
+                                        <Input
+                                            type="number"
+                                            min="1"
+                                            placeholder="Cant."
+                                            value={manualQuantity}
+                                            onChange={(e) => setManualQuantity(e.target.value)}
                                             disabled={loading}
                                         />
                                     </div>
