@@ -318,4 +318,84 @@ class ShoppingListServiceTest {
         Double budget = shoppingListService.getEstimatedBudget(house.getId());
         assertEquals(4.50, budget);
     }
+
+    @Test
+    void clearPendingListShouldDeleteOnlyPendingItemsAndReturnCount() {
+        ShoppingItem pending1 = ShoppingItem.builder().id(UUID.randomUUID()).status(ShoppingItemStatus.PENDING).build();
+        ShoppingItem pending2 = ShoppingItem.builder().id(UUID.randomUUID()).status(ShoppingItemStatus.PENDING).build();
+        when(shoppingItemRepository.findByHouseIdAndStatusOrderByCreatedAtDesc(house.getId(), ShoppingItemStatus.PENDING))
+                .thenReturn(List.of(pending1, pending2));
+
+        int count = shoppingListService.clearPendingList(house.getId());
+
+        assertEquals(2, count);
+        verify(shoppingItemRepository).deleteAll(anyList());
+    }
+
+    @Test
+    void addShoppingItemShouldNotCallCatalogWhenIsManualIsTrue() {
+        AddShoppingItemRequest request = AddShoppingItemRequest.builder()
+                .houseId(house.getId())
+                .addedById(user.getId())
+                .productName("Manual Item")
+                .isManual(true)
+                .manualPrice(5.00)
+                .build();
+
+        when(shoppingItemRepository.save(any(ShoppingItem.class))).thenAnswer(invocation -> {
+            ShoppingItem item = invocation.getArgument(0);
+            item.setId(UUID.randomUUID());
+            return item;
+        });
+
+        ShoppingItemResponse response = shoppingListService.addShoppingItem(request);
+
+        assertEquals("Manual Item", response.getName());
+        assertEquals(5.00, response.getEstimatedPrice());
+        verifyNoInteractions(productCatalogClient);
+    }
+
+    @Test
+    void updateShoppingItemAssigneesShouldFailWhenItemNotFound() {
+        UUID itemId = UUID.randomUUID();
+        when(shoppingItemRepository.findById(itemId)).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class, () -> shoppingListService.updateShoppingItemAssignees(itemId, List.of()));
+    }
+
+    @Test
+    void deleteShoppingItemShouldFailWhenItemNotFound() {
+        UUID itemId = UUID.randomUUID();
+        when(shoppingItemRepository.findById(itemId)).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class, () -> shoppingListService.deleteShoppingItem(itemId));
+    }
+
+    @Test
+    void checkoutShoppingListShouldHandleZeroEstimatedPrice() {
+        CheckoutRequest request = CheckoutRequest.builder()
+                .houseId(house.getId())
+                .paidById(user.getId())
+                .totalRealAmount(new BigDecimal("10.00"))
+                .build();
+
+        ShoppingItem item1 = ShoppingItem.builder()
+                .id(UUID.randomUUID())
+                .name("Free Item")
+                .estimatedPrice(0.0)
+                .status(ShoppingItemStatus.PENDING)
+                .build();
+
+        when(shoppingItemRepository.findByHouseIdAndStatusOrderByCreatedAtDesc(house.getId(), ShoppingItemStatus.PENDING))
+                .thenReturn(List.of(item1));
+
+        HouseMember member = TestFixtures.houseMember(house, user, HouseRole.ADMIN, "#111111");
+        when(houseMemberRepository.findByHouseId(house.getId())).thenReturn(List.of(member));
+
+        shoppingListService.checkoutShoppingList(request);
+
+        assertEquals(ShoppingItemStatus.BOUGHT, item1.getStatus());
+        verify(shoppingItemRepository).saveAll(any());
+        verify(expenseService).createExpense(any());
+    }
 }
