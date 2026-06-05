@@ -5,6 +5,7 @@ import com.kpiso.api.modules.house.dto.CreateHouseRequest;
 import com.kpiso.api.modules.house.dto.HouseDetailResponse;
 import com.kpiso.api.modules.house.dto.JoinHouseRequest;
 import com.kpiso.api.modules.house.dto.UserHouseResponse;
+import com.kpiso.api.modules.house.stats.HouseStatisticsService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -37,6 +38,9 @@ class HouseControllerTest {
 
     @MockBean
     private HouseService houseService;
+
+    @MockBean
+    private HouseStatisticsService houseStatisticsService;
 
     @Test
     void createHouseShouldReturnCreated() throws Exception {
