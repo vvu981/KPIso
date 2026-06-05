@@ -45,7 +45,7 @@ public class TaskService {
 
         List<Task> createdTasks = new ArrayList<>();
         LocalDateTime currentDate = request.getStartDate() != null ? request.getStartDate() : LocalDateTime.now();
-        currentDate = currentDate.with(java.time.LocalTime.MAX);
+        currentDate = currentDate.with(java.time.LocalTime.of(23, 59, 59));
 
         if (request.getRotationType() == RotationType.FIXED) {
             if (request.getAssignedToId() == null) {
