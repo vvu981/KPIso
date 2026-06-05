@@ -74,6 +74,15 @@ jobs:
           tree = ET.parse(xml_path)
           root = tree.getroot()
           
+          translations = {
+              'INSTRUCTION': 'Instrucciones',
+              'BRANCH': 'Ramas',
+              'LINE': 'Líneas',
+              'COMPLEXITY': 'Complejidad',
+              'METHOD': 'Métodos',
+              'CLASS': 'Clases'
+          }
+
           summary = []
           summary.append('# 📊 Cobertura de Código (JaCoCo)')
           summary.append('| Métrica | Cubierto | Perdido | Porcentaje |')
@@ -81,11 +90,12 @@ jobs:
 
           for counter in root.findall('counter'):
               c_type = counter.get('type')
+              display_name = translations.get(c_type, c_type)
               missed = int(counter.get('missed'))
               covered = int(counter.get('covered'))
               total = missed + covered
               percentage = (covered / total * 100) if total > 0 else 0
-              summary.append(f'| {c_type} | {covered} | {missed} | {percentage:.2f}% |')
+              summary.append(f'| {display_name} | {covered} | {missed} | {percentage:.2f}% |')
 
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
               f.write('\n'.join(summary))
