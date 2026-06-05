@@ -157,9 +157,9 @@ class TaskServiceTest {
 
         assertEquals(3, responses.size());
         assertEquals("Rotación diaria (Turno 1)", responses.get(0).getTitle());
-        assertEquals(request.getStartDate(), responses.get(0).getDueDate());
-        assertEquals(request.getStartDate().plusDays(1), responses.get(1).getDueDate());
-        assertEquals(request.getStartDate().plusDays(2), responses.get(2).getDueDate());
+        assertEquals(request.getStartDate().with(java.time.LocalTime.of(23, 59, 59)), responses.get(0).getDueDate());
+        assertEquals(request.getStartDate().with(java.time.LocalTime.of(23, 59, 59)).plusDays(1), responses.get(1).getDueDate());
+        assertEquals(request.getStartDate().with(java.time.LocalTime.of(23, 59, 59)).plusDays(2), responses.get(2).getDueDate());
     }
 
     @Test
@@ -211,7 +211,7 @@ class TaskServiceTest {
         List<TaskResponse> responses = taskService.createTask(request);
 
         assertEquals(2, responses.size());
-        assertEquals(request.getStartDate().plusMonths(1), responses.get(1).getDueDate());
+        assertEquals(request.getStartDate().with(java.time.LocalTime.of(23, 59, 59)).plusMonths(1), responses.get(1).getDueDate());
     }
 
     @Test
