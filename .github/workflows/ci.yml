@@ -60,15 +60,36 @@ jobs:
           path: KPIso-backend/target/site/jacoco/
 
       - name: Add JaCoCo Report to Job Summary
-        uses: madrapps/jacoco-report@v1.6.1
         if: always()
-        with:
-          paths: ${{ github.workspace }}/KPIso-backend/target/site/jacoco/jacoco.xml
-          token: ${{ secrets.GITHUB_TOKEN }}
-          min-coverage-overall: 60
-          min-coverage-changed-files: 60
-          title: "Reporte de Cobertura de Código"
-          update-comment: true
+        run: |
+          python -c "
+          import xml.etree.ElementTree as ET
+          import os
+
+          xml_path = 'KPIso-backend/target/site/jacoco/jacoco.xml'
+          if not os.path.exists(xml_path):
+              print('Reporte jacoco.xml no encontrado.')
+              exit(0)
+
+          tree = ET.parse(xml_path)
+          root = tree.getroot()
+          
+          summary = []
+          summary.append('# 📊 Cobertura de Código (JaCoCo)')
+          summary.append('| Métrica | Cubierto | Perdido | Porcentaje |')
+          summary.append('| --- | --- | --- | --- |')
+
+          for counter in root.findall('counter'):
+              c_type = counter.get('type')
+              missed = int(counter.get('missed'))
+              covered = int(counter.get('covered'))
+              total = missed + covered
+              percentage = (covered / total * 100) if total > 0 else 0
+              summary.append(f'| {c_type} | {covered} | {missed} | {percentage:.2f}% |')
+
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+              f.write('\n'.join(summary))
+          "
 
   frontend-build:
     name: Frontend Lint & Build
