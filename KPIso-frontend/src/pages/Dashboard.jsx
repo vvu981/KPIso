@@ -46,6 +46,17 @@ const IconArchive = () => (
         <line x1="10" y1="12" x2="14" y2="12"/>
     </svg>
 );
+const IconCopy = () => (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+    </svg>
+);
+const IconCheckMini = () => (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--success, #10b981)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <polyline points="20 6 9 17 4 12"/>
+    </svg>
+);
 
 const HOUSE_TABS = [
     { id: 'active', label: 'Casas Activas', icon: <IconHome /> },
@@ -412,6 +423,7 @@ function EmptyState({ activeTab, onCreateClick, onJoinClick }) {
  * HouseCard — Tarjeta de vivienda
  */
 function HouseCard({ house, isDeleted, onDelete }) {
+    const [copied, setCopied] = useState(false);
     const initial = house.name.charAt(0).toUpperCase();
 
     return (
@@ -466,9 +478,38 @@ function HouseCard({ house, isDeleted, onDelete }) {
                                 color: 'var(--text-tertiary)',
                                 fontFamily: 'var(--font-mono)',
                                 fontWeight: 'var(--font-medium)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px'
                             }}
                         >
                             {house.inviteCode}
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigator.clipboard.writeText(house.inviteCode);
+                                    setCopied(true);
+                                    setTimeout(() => setCopied(false), 2000);
+                                }}
+                                style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    padding: '2px',
+                                    cursor: 'pointer',
+                                    color: copied ? 'var(--success)' : 'var(--text-tertiary)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderRadius: 'var(--radius-sm)',
+                                    transition: 'color 0.15s, background 0.15s'
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-elevated-hover)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                title="Copiar código de invitación"
+                            >
+                                {copied ? <IconCheckMini /> : <IconCopy />}
+                            </button>
                         </span>
                     </div>
                 </div>

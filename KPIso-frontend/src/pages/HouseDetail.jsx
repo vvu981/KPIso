@@ -49,6 +49,17 @@ const IconShield = () => (
         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
     </svg>
 );
+const IconCopy = () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+);
+const IconCheckMini = () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success, #10b981)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <polyline points="20 6 9 17 4 12" />
+    </svg>
+);
 const IconUsers = () => (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -730,6 +741,7 @@ export default function HouseDetail() {
  * HouseDetailHeader — Encabezado con navegación por tabs
  */
 function HouseDetailHeader({ house, activeTab, onTabChange, onEditClick, onDeleteClick, isAdmin }) {
+    const [codeCopied, setCodeCopied] = useState(false);
     return (
         <header
             style={{
@@ -802,9 +814,37 @@ function HouseDetailHeader({ house, activeTab, onTabChange, onEditClick, onDelet
                                 fontSize: 'var(--text-xs)',
                                 color: 'var(--text-tertiary)',
                                 fontFamily: 'var(--font-mono)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
                             }}
                         >
                             Código: {house.inviteCode}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    navigator.clipboard.writeText(house.inviteCode);
+                                    setCodeCopied(true);
+                                    setTimeout(() => setCodeCopied(false), 2000);
+                                }}
+                                style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    padding: '2px',
+                                    cursor: 'pointer',
+                                    color: codeCopied ? 'var(--success)' : 'var(--text-tertiary)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderRadius: 'var(--radius-sm)',
+                                    transition: 'color 0.15s, background 0.15s'
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-elevated-hover)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                title="Copiar código de invitación"
+                            >
+                                {codeCopied ? <IconCheckMini /> : <IconCopy />}
+                            </button>
                         </p>
                     </div>
                 </div>
@@ -918,138 +958,142 @@ function HouseSidebar({
                 ))}
             </div>
 
-            {sidebarView === 'money' && (
-                <div style={{
-                    marginBottom: 'var(--space-4)',
-                    padding: 'var(--space-3)',
-                    borderRadius: 'var(--radius-lg)',
-                    backgroundColor: 'rgba(16, 185, 129, 0.08)',
-                    border: '1px solid rgba(16, 185, 129, 0.2)',
-                    fontSize: '11px',
-                    color: 'var(--text-secondary)',
-                    lineHeight: '1.4'
-                }}>
-                    <strong>Checklist de Consenso:</strong> Confirma con tu check si estás conforme con los saldos. La liquidación general se habilitará al completarse.
-                </div>
-            )}
+            {
+        sidebarView === 'money' && (
+            <div style={{
+                marginBottom: 'var(--space-4)',
+                padding: 'var(--space-3)',
+                borderRadius: 'var(--radius-lg)',
+                backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                border: '1px solid rgba(16, 185, 129, 0.2)',
+                fontSize: '11px',
+                color: 'var(--text-secondary)',
+                lineHeight: '1.4'
+            }}>
+                <strong>Checklist de Consenso:</strong> Confirma con tu check si estás conforme con los saldos. La liquidación general se habilitará al completarse.
+            </div>
+        )
+    }
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                {members.map((member) => {
-                    const status = memberStatuses[member.userId] || { balance: 0, color: '#6366f1', points: 0 };
-                    const value = sidebarView === 'money' ? `${status.balance.toFixed(2)}€` : `${status.points} pts`;
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+        {members.map((member) => {
+            const status = memberStatuses[member.userId] || { balance: 0, color: '#6366f1', points: 0 };
+            const value = sidebarView === 'money' ? `${status.balance.toFixed(2)}€` : `${status.points} pts`;
 
-                    return (
+            return (
+                <div
+                    key={member.userId}
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: 'var(--space-3)',
+                        borderRadius: 'var(--radius-lg)',
+                        backgroundColor: 'var(--bg-elevated)',
+                        border: '1px solid var(--border-subtle)',
+                    }}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                         <div
-                            key={member.userId}
+                            onClick={() => {
+                                if (member.userId === currentUserId && !isReadOnly) {
+                                    onToggleSettleApproval(member.settleApproved);
+                                }
+                            }}
+                            title={member.userId === currentUserId ? "Tu conformidad para liquidar cuentas" : `${member.username} ${member.settleApproved ? 'ha dado conformidad' : 'aún no ha dado conformidad'}`}
                             style={{
+                                cursor: member.userId === currentUserId && !isReadOnly ? 'pointer' : 'not-allowed',
+                                width: '18px',
+                                height: '18px',
+                                borderRadius: 'var(--radius-sm)',
+                                border: `2px solid ${member.settleApproved ? 'var(--success)' : 'var(--border-default)'}`,
+                                backgroundColor: member.settleApproved ? 'var(--success)' : 'transparent',
                                 display: 'flex',
                                 alignItems: 'center',
-                                justifyContent: 'space-between',
-                                padding: 'var(--space-3)',
-                                borderRadius: 'var(--radius-lg)',
-                                backgroundColor: 'var(--bg-elevated)',
-                                border: '1px solid var(--border-subtle)',
+                                justifyContent: 'center',
+                                transition: 'all 200ms ease',
                             }}
                         >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                                <div
-                                    onClick={() => {
-                                        if (member.userId === currentUserId && !isReadOnly) {
-                                            onToggleSettleApproval(member.settleApproved);
-                                        }
-                                    }}
-                                    title={member.userId === currentUserId ? "Tu conformidad para liquidar cuentas" : `${member.username} ${member.settleApproved ? 'ha dado conformidad' : 'aún no ha dado conformidad'}`}
-                                    style={{
-                                        cursor: member.userId === currentUserId && !isReadOnly ? 'pointer' : 'not-allowed',
-                                        width: '18px',
-                                        height: '18px',
-                                        borderRadius: 'var(--radius-sm)',
-                                        border: `2px solid ${member.settleApproved ? 'var(--success)' : 'var(--border-default)'}`,
-                                        backgroundColor: member.settleApproved ? 'var(--success)' : 'transparent',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        transition: 'all 200ms ease',
-                                    }}
-                                >
-                                    {member.settleApproved && (
-                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
-                                            <polyline points="20 6 9 17 4 12" />
-                                        </svg>
-                                    )}
-                                </div>
-                                <div
-                                    style={{
-                                        width: 12,
-                                        height: 12,
-                                        borderRadius: '50%',
-                                        backgroundColor: status.color,
-                                        boxShadow: `0 0 8px ${status.color}40`,
-                                    }}
-                                />
-                                <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-bold)' }}>
-                                    {member.username}
-                                </span>
-                                {member.role === 'ADMIN' && (
-                                    <Badge variant="primary" size="xs">
-                                        Admin
-                                    </Badge>
-                                )}
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                                <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-bold)', color: status.balance >= 0 || sidebarView === 'points' ? 'var(--success)' : 'var(--danger)' }}>
-                                    {status.balance > 0 && sidebarView === 'money' ? '+' : ''}{value}
-                                </span>
-                                {member.userId === currentUserId && !isReadOnly && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
-                                        <input
-                                            type="color"
-                                            value={status.color}
-                                            onChange={(e) => onColorChange(e.target.value)}
-                                            style={{ width: 18, height: 18, border: 'none', borderRadius: '4px', cursor: 'pointer', backgroundColor: 'transparent' }}
-                                        />
-
-                                    </div>
-                                )}
-                                {isAdmin && member.userId !== currentUserId && !isReadOnly && (
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => onRemoveMember(member.userId, member.username)}
-                                        title="Expulsar"
-                                        style={{ marginLeft: 'var(--space-1)', padding: 0 }}
-                                    >
-                                        <IconX />
-                                    </Button>
-                                )}
-                            </div>
+                            {member.settleApproved && (
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                            )}
                         </div>
-                    );
-                })}
-            </div>
-
-            {!isReadOnly && sidebarView === 'money' && (
-                <div style={{ marginTop: 'var(--space-4)' }}>
-                    <Button
-                        variant="secondary"
-                        full
-                        onClick={onRegisterDirectPayment}
-                        style={{
-                            borderColor: 'var(--success)',
-                            color: 'var(--success)',
-                            backgroundColor: 'transparent',
-                            fontWeight: 'bold',
-                            borderWidth: '2px',
-                            transition: 'all 0.2s ease-in-out'
-                        }}
-                    >
-                        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                            <IconBanknotes /> Registrar Bizum / Pago
+                        <div
+                            style={{
+                                width: 12,
+                                height: 12,
+                                borderRadius: '50%',
+                                backgroundColor: status.color,
+                                boxShadow: `0 0 8px ${status.color}40`,
+                            }}
+                        />
+                        <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-bold)' }}>
+                            {member.username}
                         </span>
-                    </Button>
+                        {member.role === 'ADMIN' && (
+                            <Badge variant="primary" size="xs">
+                                Admin
+                            </Badge>
+                        )}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                        <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-bold)', color: status.balance >= 0 || sidebarView === 'points' ? 'var(--success)' : 'var(--danger)' }}>
+                            {status.balance > 0 && sidebarView === 'money' ? '+' : ''}{value}
+                        </span>
+                        {member.userId === currentUserId && !isReadOnly && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+                                <input
+                                    type="color"
+                                    value={status.color}
+                                    onChange={(e) => onColorChange(e.target.value)}
+                                    style={{ width: 18, height: 18, border: 'none', borderRadius: '4px', cursor: 'pointer', backgroundColor: 'transparent' }}
+                                />
+
+                            </div>
+                        )}
+                        {isAdmin && member.userId !== currentUserId && !isReadOnly && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => onRemoveMember(member.userId, member.username)}
+                                title="Expulsar"
+                                style={{ marginLeft: 'var(--space-1)', padding: 0 }}
+                            >
+                                <IconX />
+                            </Button>
+                        )}
+                    </div>
                 </div>
-            )}
-        </Card>
+            );
+        })}
+    </div>
+
+    {
+        !isReadOnly && sidebarView === 'money' && (
+            <div style={{ marginTop: 'var(--space-4)' }}>
+                <Button
+                    variant="secondary"
+                    full
+                    onClick={onRegisterDirectPayment}
+                    style={{
+                        borderColor: 'var(--success)',
+                        color: 'var(--success)',
+                        backgroundColor: 'transparent',
+                        fontWeight: 'bold',
+                        borderWidth: '2px',
+                        transition: 'all 0.2s ease-in-out'
+                    }}
+                >
+                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                        <IconBanknotes /> Registrar Bizum / Pago
+                    </span>
+                </Button>
+            </div>
+        )
+    }
+        </Card >
     );
 }
 
