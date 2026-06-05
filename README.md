@@ -9,10 +9,12 @@
 ### 1. 📋 Gestión Gamificada de Deberes (Tareas) y Sistema de Puntos KPI
 KPIso introduce una mecánica gamificada para incentivar el cumplimiento a tiempo de las responsabilidades del hogar. El sistema evalúa el desempeño de los integrantes de forma mensual en función del estado de las tareas y sus asignaciones:
 
-* **Fórmula de Asignación Temporal:** Las tareas pueden asignarse bajo tres modalidades:
-  * **Rotación Semanal:** Distribución rotativa periódica automática entre los miembros de la casa seleccionados.
+* **Fórmula de Asignación Temporal y Rueda Rotativa:** Las tareas pueden asignarse bajo tres modalidades:
+  * **Rotación Diaria, Semanal o Mensual:** Distribución rotativa automática entre los miembros de la casa. Al crear la tarea, se puede designar explícitamente a la **primera persona responsable** para encabezar la secuencia de rotación.
   * **Tareas Fijas:** Asignación dedicada fija a un único conviviente.
   * **Días Específicos:** Planificación fina en días específicos de la semana con proyección visual en un calendario mensual interactivo.
+  * *Facilidad de Asignación:* La selección de participantes en el formulario de deberes cuenta con botones ágiles de **Marcar/Desmarcar todos** para asignación masiva.
+  * *Acción de Rescate:* Las tareas pendientes expiradas y rescatables muestran de manera destacada el icono de salvavidas (`IconLifebuoy`) para una rápida acción de salvamento.
 * **Cálculo Mensual de Puntos KPI:**
   Se evalúan únicamente las tareas cuya fecha de evaluación (`completedAt` si está completada, o `dueDate` si está pendiente) pertenece al mes y año actuales. La puntuación individual de cada miembro se calcula según las siguientes reglas de negocio:
   * **Caso A: Rescate con Retraso (Late Rescue):** Si una tarea es completada por un usuario (rescatador) que **no es el usuario asignado originalmente**, y la fecha de finalización (`completedAt`) es **posterior** a la fecha de vencimiento (`dueDate`):
@@ -31,6 +33,9 @@ KPIso introduce una mecánica gamificada para incentivar el cumplimiento a tiemp
 
 ### 2. 💶 Gastos Compartidos, Balances y Motor de Liquidación Cruzada
 El sistema financiero de KPIso rastrea cada aportación individual para calcular de forma transparente el saldo neto global de cada miembro del hogar, facilitando acuerdos justos sin fricciones.
+
+* **Registro Flexible y Selector de Pagador:** Al subir un gasto manual, es posible seleccionar explícitamente **quién ha realizado el pago** desde un selector desplegable (autoseleccionando por defecto al usuario activo).
+* **Asignación de Beneficiarios Ágil:** El formulario de reparto cuenta con botones rápidos para **Marcar/Desmarcar todos** los convivientes del piso.
 
 #### A. Reparto de Gastos (`exactSplits`)
 Cuando un usuario registra un gasto, este puede dividirse de dos maneras:
@@ -64,7 +69,7 @@ Para simplificar los cobros y evitar transferencias redundantes, KPIso implement
 ### 3. 🛒 Lista de la Compra Inteligente y Checkout Proporcional
 La lista de la compra de KPIso agiliza el abastecimiento del hogar mediante la automatización de la estimación de costes y la integración con el sistema contable general.
 
-* **Buscador Asistido (Open Food Facts):** Al escribir el nombre de un artículo, el sistema realiza sugerencias en tiempo real consultando la base de datos externa de alimentos. Importa de forma automatizada las etiquetas de categoría del producto, su imagen promocional y estima un coste aproximado en base a su clasificación de catálogo (con soporte de sobrescritura de precio manual).
+* **Buscador Asistido o Añadido Manual por Cantidad:** Al escribir un producto, se proponen sugerencias en tiempo real de Open Food Facts. Si el producto se añade de forma manual, el formulario incluye un **campo de cantidad numérico** para registrar múltiples unidades de forma agrupada al instante.
 * **Asignación de Consumidores:** Cada producto de la lista incluye un selector de usuarios asignados. Esto delimita quién va a consumir o beneficiarse de dicho producto. Si se deja vacío, se asume por defecto que el producto es consumido por todos los miembros del hogar.
 * **Algoritmo de Checkout y Prorrateo del Ticket:**
   Cuando se realiza la compra física y se pulsa "Pagar compra", el usuario ingresa el **importe real pagado en el supermercado** ($\text{ImporteReal}$) y el pagador del ticket. El sistema realiza los siguientes pasos matemáticos para distribuir los costes justamente:
@@ -86,9 +91,16 @@ La lista de la compra de KPIso agiliza el abastecimiento del hogar mediante la a
 ### 4. 🛡️ Auditoría y Transparencia Total
 * **Registro de Actividades (Audit Trail):** Todas las acciones críticas (creación, edición o eliminación de tareas y gastos, registros de checkouts de compras y liquidaciones) generan un registro inalterable que detalla la acción, el usuario responsable, la casa y la marca de tiempo exacta. Esto previene conflictos y asegura claridad absoluta en las cuentas e historial del hogar.
 
+### 5. 📊 Panel de Estadísticas y Análisis de Convivencia
+KPIso proporciona un módulo analítico interactivo con diseño Glassmorphism y selectores de períodos fluidos para monitorear el rendimiento y coste de vida en el hogar:
+* **Coste de Vida Individual:** Tarjetas dinámicas que resumen el gasto neto desembolsado por cada miembro de la casa en el período de consulta seleccionado.
+* **Evolución Mensual de Gastos:** Gráfico de líneas interactivo de Recharts alimentado por las claves `yearMonth` y `totalAmount` para reflejar la evolución del gasto total.
+* **Hábitos de Compra & Top Gastos:** Tablas detalladas que exponen los 10 gastos más caros de la casa, así como los 5 productos más frecuentes y los 5 más costosos de la lista de compra, visualizando el precio unitario promedio calculado (`precio/cantidad`).
+* **Puntos de Convivencia KPI:** Gráfico de barras interactivo de Recharts que clasifica de mayor a menor a los miembros según su contribución a las tareas domésticas y acciones de rescate de deberes vencidos.
+
 ---
 
-### 5. 🎨 UX/UI Glassmorphism y Personalización Premium
+### 6. 🎨 UX/UI Glassmorphism y Personalización Premium
 * **Estilo Visual Moderno:** Interfaz estilizada con efectos de desenfoque de fondo (`backdrop-filter`), sombras suaves y bordes redondeados.
 * **Modo Oscuro / Modo Claro Dinámico:** Toggle interactivo que adapta instantáneamente la combinación de colores y contrastes.
 * **Color Representativo:** Cada miembro del hogar puede elegir su color en formato hexadecimal para personalizar su presencia visual, teñir sus tareas asignadas y representarse en gráficos.
