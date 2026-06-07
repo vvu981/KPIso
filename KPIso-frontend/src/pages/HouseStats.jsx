@@ -79,7 +79,7 @@ export default function HouseStats({ houseId, members = [], memberStatuses = {} 
         members.forEach((m) => {
             // userId es el campo del User; id sería el del HouseMember si se expone
             if (m.userId) map[m.userId] = m.username;
-            if (m.id)     map[m.id]     = m.username;
+            if (m.id) map[m.id] = m.username;
         });
         return map;
     }, [members]);
@@ -93,10 +93,10 @@ export default function HouseStats({ houseId, members = [], memberStatuses = {} 
 
     // ── Extraer y normalizar los campos del DTO del backend ──────────────────
     const livingCostPerMember = data?.livingCostPerMember ?? {};   // Map<UUID, BigDecimal>
-    const monthlyEvolution    = data?.monthlyExpenseEvolution ?? []; // [{ month, total }]
-    const topExpenses         = data?.topExpenses ?? [];             // [{ id, description, amount, date, memberId }]
-    const productStats        = data?.productStats ?? {};            // { topFrequentProducts, topExpensiveProducts }
-    const taskKpiPoints       = data?.taskKpiPoints ?? {};           // Map<UUID, Integer>
+    const monthlyEvolution = data?.monthlyExpenseEvolution ?? []; // [{ month, total }]
+    const topExpenses = data?.topExpenses ?? [];             // [{ id, description, amount, date, memberId }]
+    const productStats = data?.productStats ?? {};            // { topFrequentProducts, topExpensiveProducts }
+    const taskKpiPoints = data?.taskKpiPoints ?? {};           // Map<UUID, Integer>
 
     // 1. Coste de vida — enriquecido con nombre del miembro
     const memberCostEntries = Object.entries(livingCostPerMember).map(([memberId, amount]) => ({
@@ -139,47 +139,7 @@ export default function HouseStats({ houseId, members = [], memberStatuses = {} 
                     flexWrap: 'wrap',
                 }}
             >
-                <h2
-                    style={{
-                        margin: 0,
-                        fontSize: 'var(--text-xl)',
-                        fontWeight: 'var(--font-bold)',
-                        color: 'var(--text-primary)',
-                    }}
-                >
-                    Estadísticas de la casa
-                </h2>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginLeft: 'auto' }}>
-                    <label
-                        htmlFor="houseStats-monthSelect"
-                        style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}
-                    >
-                        Período:
-                    </label>
-                    <select
-                        id="houseStats-monthSelect"
-                        value={selectedMonth}
-                        onChange={(e) => setSelectedMonth(e.target.value)}
-                        style={{
-                            padding: 'var(--space-2) var(--space-3)',
-                            borderRadius: 'var(--radius-md)',
-                            border: '1px solid var(--glass-border)',
-                            background: 'var(--glass-bg)',
-                            color: 'var(--text-primary)',
-                            fontSize: 'var(--text-sm)',
-                            cursor: 'pointer',
-                            backdropFilter: 'var(--glass-blur)',
-                            outline: 'none',
-                        }}
-                    >
-                        {monthOptions.map((opt) => (
-                            <option key={opt.value} value={opt.value} style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)' }}>
-                                {opt.label}
-                            </option>
-                        ))}
-                    </select>
-                </div>
             </div>
 
             {/* ── Estado de carga ──────────────────────────────────────────── */}
@@ -214,6 +174,49 @@ export default function HouseStats({ houseId, members = [], memberStatuses = {} 
                         padding: 'var(--space-6)',
                     }}
                 >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
+                        <h2
+                            style={{
+                                margin: 0,
+                                fontSize: 'var(--text-xl)',
+                                fontWeight: 'var(--font-bold)',
+                                color: 'var(--text-primary)',
+                            }}
+                        >
+                            Estadísticas de la casa
+                        </h2>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginLeft: 'auto' }}>
+                            <label
+                                htmlFor="houseStats-monthSelect"
+                                style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}
+                            >
+                                Período:
+                            </label>
+                            <select
+                                id="houseStats-monthSelect"
+                                value={selectedMonth}
+                                onChange={(e) => setSelectedMonth(e.target.value)}
+                                style={{
+                                    padding: 'var(--space-2) var(--space-3)',
+                                    borderRadius: 'var(--radius-md)',
+                                    border: '1px solid var(--glass-border)',
+                                    background: 'var(--glass-bg)',
+                                    color: 'var(--text-primary)',
+                                    fontSize: 'var(--text-sm)',
+                                    cursor: 'pointer',
+                                    backdropFilter: 'var(--glass-blur)',
+                                    outline: 'none',
+                                }}
+                            >
+                                {monthOptions.map((opt) => (
+                                    <option key={opt.value} value={opt.value} style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)' }}>
+                                        {opt.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
                     {/* Resumen de Convivientes (Balance y Puntos) */}
                     <div>
                         <h3 style={sectionTitleStyle}>Resumen de Convivientes</h3>
