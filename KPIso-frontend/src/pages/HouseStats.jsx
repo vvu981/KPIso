@@ -7,6 +7,7 @@ import TopExpensesTable from '../components/stats/TopExpensesTable';
 import TopProductsTable from '../components/stats/TopProductsTable';
 import ConvivenciaKpiChart from '../components/stats/ConvivenciaKpiChart';
 import { Card } from '../components/ui/Card.jsx';
+import { Badge } from '../components/ui/Badge.jsx';
 
 // ── Icono local ──────────────────────────────────────────────────────────────
 const IconPerson = () => (
@@ -58,7 +59,7 @@ function buildMonthOptions() {
  * Todos los datos monetarios excluyen DIRECT_PAYMENT (gestionado en el backend).
  * Sin caché: cada cambio de mes lanza una nueva petición.
  */
-export default function HouseStats({ houseId, members = [] }) {
+export default function HouseStats({ houseId, members = [], memberStatuses = {} }) {
     const authContext = useContext(AuthContext);
 
     // Selector de mes — por defecto el mes actual ('YYYY-MM')
@@ -213,6 +214,65 @@ export default function HouseStats({ houseId, members = [] }) {
                         padding: 'var(--space-6)',
                     }}
                 >
+                    {/* Resumen de Convivientes (Balance y Puntos) */}
+                    <div>
+                        <h3 style={sectionTitleStyle}>Resumen de Convivientes</h3>
+                        <div
+                            style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                                gap: 'var(--space-3)',
+                            }}
+                        >
+                            {members.map((member) => {
+                                const status = memberStatuses[member.userId] || { balance: 0, color: '#6366f1', points: 0 };
+                                return (
+                                    <div
+                                        key={member.userId}
+                                        style={{
+                                            ...glassCardStyle,
+                                            alignItems: 'stretch',
+                                            textAlign: 'left',
+                                            padding: 'var(--space-4)',
+                                        }}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
+                                            <div
+                                                style={{
+                                                    width: 12,
+                                                    height: 12,
+                                                    borderRadius: '50%',
+                                                    backgroundColor: status.color,
+                                                    boxShadow: `0 0 8px ${status.color}40`,
+                                                }}
+                                            />
+                                            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-bold)', color: 'var(--text-primary)' }}>
+                                                {member.username}
+                                            </span>
+                                            {member.role === 'ADMIN' && (
+                                                <Badge variant="primary" size="xs">
+                                                    Admin
+                                                </Badge>
+                                            )}
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
+                                            <span>Balance:</span>
+                                            <span style={{ fontWeight: 'var(--font-bold)', color: status.balance >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                                                {status.balance > 0 ? '+' : ''}{status.balance.toFixed(2)}€
+                                            </span>
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', marginTop: 'var(--space-1)' }}>
+                                            <span>Puntos KPI:</span>
+                                            <span style={{ fontWeight: 'var(--font-bold)', color: 'var(--success)' }}>
+                                                {status.points} pts
+                                            </span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
                     {/* 1. Coste de vida por persona */}
                     <div>
                         <h3 style={sectionTitleStyle}>Coste de vida por persona</h3>

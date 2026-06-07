@@ -565,33 +565,35 @@ export default function HouseDetail() {
                     margin: '0 auto',
                     padding: 'var(--space-8) var(--space-4)',
                     display: 'grid',
-                    gridTemplateColumns: '1fr 2fr',
+                    gridTemplateColumns: activeTab === 'stats' ? '1fr' : '1fr 2fr',
                     gap: 'var(--space-6)',
                 }}
             >
                 {/* Sidebar */}
-                <aside>
-                    <HouseSidebar
-                        members={house.members}
-                        memberStatuses={memberStatuses}
-                        sidebarView={sidebarView}
-                        onSidebarViewChange={setSidebarView}
-                        onRemoveMember={handleRemoveMember}
-                        currentUserId={currentUserId}
-                        isAdmin={selfIsAdmin}
-                        onColorChange={handleColorChange}
-                        onEditProfile={() => {
-                            setProfileFormData({
-                                username: currentUsername || '',
-                                profilePictureUrl: '',
-                            });
-                            setShowEditProfileModal(true);
-                        }}
-                        isReadOnly={house.isReadOnly}
-                        onRegisterDirectPayment={() => setShowDirectPaymentModal(true)}
-                        onToggleSettleApproval={handleToggleSettleApproval}
-                    />
-                </aside>
+                {activeTab !== 'stats' && (
+                    <aside>
+                        <HouseSidebar
+                            members={house.members}
+                            memberStatuses={memberStatuses}
+                            sidebarView={sidebarView}
+                            onSidebarViewChange={setSidebarView}
+                            onRemoveMember={handleRemoveMember}
+                            currentUserId={currentUserId}
+                            isAdmin={selfIsAdmin}
+                            onColorChange={handleColorChange}
+                            onEditProfile={() => {
+                                setProfileFormData({
+                                    username: currentUsername || '',
+                                    profilePictureUrl: '',
+                                });
+                                setShowEditProfileModal(true);
+                            }}
+                            isReadOnly={house.isReadOnly}
+                            onRegisterDirectPayment={() => setShowDirectPaymentModal(true)}
+                            onToggleSettleApproval={handleToggleSettleApproval}
+                        />
+                    </aside>
+                )}
 
                 {/* Contenido según Tab */}
                 <section>
@@ -673,7 +675,7 @@ export default function HouseDetail() {
 
                     {/* Panel de estadísticas */}
                     {activeTab === 'stats' && (
-                        <HouseStats houseId={houseId} members={house.members} />
+                        <HouseStats houseId={houseId} members={house.members} memberStatuses={memberStatuses} />
                     )}
                 </section>
             </main>
