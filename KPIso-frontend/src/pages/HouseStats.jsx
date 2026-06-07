@@ -167,11 +167,11 @@ export default function HouseStats({ houseId, members = [], memberStatuses = {} 
             {/* ── Contenido (solo cuando hay datos) ───────────────────────── */}
             {!loading && !error && data && (
                 <Card
+                    padding="lg"
                     style={{
                         display: 'flex',
                         flexDirection: 'column',
                         gap: 'var(--space-6)',
-                        padding: 'var(--space-6)',
                     }}
                 >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
