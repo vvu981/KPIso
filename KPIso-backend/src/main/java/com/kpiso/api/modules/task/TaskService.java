@@ -99,7 +99,7 @@ public class TaskService {
                 }
             } else if (request.getRotationType() == RotationType.MONTHLY) {
                 for (int i = 0; i < occurrences; i++) {
-                    dates.add(currentDate.plusMonths(i));
+                    dates.add(currentDate.plusMonths(i).with(java.time.temporal.TemporalAdjusters.lastDayOfMonth()));
                 }
             } else {
                 // default to daily
@@ -249,7 +249,7 @@ public class TaskService {
         if (type == RotationType.WEEKLY)
             return current.plusWeeks(1);
         if (type == RotationType.MONTHLY)
-            return current.plusMonths(1);
+            return current.plusMonths(1).with(java.time.temporal.TemporalAdjusters.lastDayOfMonth());
         return current.plusDays(1);
     }
 
@@ -312,7 +312,7 @@ public class TaskService {
             User assignee = userRepository.findById(request.getAssignedToId())
                     .orElseThrow(() -> new IllegalArgumentException("El usuario asignado no existe"));
             task.setAssignedTo(assignee);
-        } else {
+        } else if (task.getRotationType() == RotationType.FIXED) {
             task.setAssignedTo(null);
         }
 

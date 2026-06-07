@@ -17,6 +17,8 @@ import jakarta.transaction.Transactional;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
+import com.kpiso.api.modules.user.User;
+import java.math.RoundingMode;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
@@ -54,8 +56,8 @@ public class HouseStatisticsService {
     // ── 1. Coste de vida por persona ──────────────────────────────────────────
 
     /**
-     * Suma el importe de cada gasto (excluye pagos directos, identificados
-     * por títulos que empiezan con "Liquidación:") por usuario que pagó.
+     * Suma la parte correspondiente de cada gasto (excluye pagos directos, identificados
+     * por títulos que empiezan con "Liquidación:") por usuario participante.
      * Los gastos liquidados (settled=true) también se incluyen para reflejar
      * el coste histórico real.
      */
@@ -81,11 +83,42 @@ public class HouseStatisticsService {
                 if (!expenseMonth.equals(month)) continue;
             }
 
-            UUID payerId = e.getPaidBy().getId();
-            costPerMember.merge(payerId, e.getAmount(), BigDecimal::add);
+            Map<UUID, BigDecimal> splits = calculateSplits(e);
+            for (Map.Entry<UUID, BigDecimal> entry : splits.entrySet()) {
+                UUID participantId = entry.getKey();
+                BigDecimal amount = entry.getValue();
+                if (costPerMember.containsKey(participantId)) {
+                    costPerMember.merge(participantId, amount, BigDecimal::add);
+                }
+            }
         }
 
         return costPerMember;
+    }
+
+    private Map<UUID, BigDecimal> calculateSplits(Expense e) {
+        Map<UUID, BigDecimal> splits = new HashMap<>();
+        if (e.getExactSplits() != null && !e.getExactSplits().isEmpty()) {
+            return e.getExactSplits();
+        }
+
+        List<User> participants = e.getParticipants();
+        int numParticipants = participants.size();
+        if (numParticipants == 0) {
+            return splits;
+        }
+
+        long totalCents = e.getAmount().movePointRight(2).setScale(0, RoundingMode.HALF_UP).longValue();
+        long baseShareCents = totalCents / numParticipants;
+        long remainderCents = totalCents % numParticipants;
+
+        for (int i = 0; i < numParticipants; i++) {
+            long cents = baseShareCents + (i < remainderCents ? 1 : 0);
+            BigDecimal share = BigDecimal.valueOf(cents).movePointLeft(2);
+            splits.put(participants.get(i).getId(), share);
+        }
+
+        return splits;
     }
 
     // ── 2. Evolución mensual de gastos ────────────────────────────────────────
@@ -226,37 +259,27 @@ public class HouseStatisticsService {
                 .filter(HouseMember::isActive)
                 .forEach(m -> pointsMap.put(m.getUser().getId(), 0));
 
-        YearMonth targetMonth = (month != null) ? month : YearMonth.now();
         LocalDateTime now = LocalDateTime.now();
 
         for (Task t : allTasks) {
-            // Determinar la fecha de referencia para filtrar por mes
             LocalDateTime evaluationDate = t.getCompletedAt() != null ? t.getCompletedAt() : t.getDueDate();
             if (evaluationDate == null) continue;
-            if (!YearMonth.from(evaluationDate).equals(targetMonth)) continue;
+            if (month != null && !YearMonth.from(evaluationDate).equals(month)) continue;
 
             if (t.getStatus() == TaskStatus.COMPLETED) {
                 if (t.getCompletedBy() == null) continue;
-
-                UUID rescuerId  = t.getCompletedBy().getId();
+                UUID rescuerId = t.getCompletedBy().getId();
                 UUID assignedId = t.getAssignedTo() != null ? t.getAssignedTo().getId() : null;
 
-                // Otro usuario completó la tarea fuera del plazo del asignado
-                boolean lateRescue = assignedId != null
-                        && !assignedId.equals(rescuerId)
-                        && t.getDueDate() != null
-                        && t.getCompletedAt() != null
-                        && t.getCompletedAt().isAfter(t.getDueDate());
+                // Sumar al que completó la tarea (sea suya o un rescate)
+                pointsMap.computeIfPresent(rescuerId, (k, v) -> v + t.getPoints());
 
-                if (lateRescue) {
-                    pointsMap.computeIfPresent(rescuerId,  (k, v) -> v + t.getPoints());
+                // Si la completó otro, restar al asignado original por no haberla completado él
+                if (assignedId != null && !assignedId.equals(rescuerId)) {
                     pointsMap.computeIfPresent(assignedId, (k, v) -> v - t.getPoints());
-                } else {
-                    pointsMap.computeIfPresent(rescuerId,  (k, v) -> v + t.getPoints());
                 }
-
             } else if (t.getStatus() == TaskStatus.PENDING) {
-                // Tarea pendiente vencida con asignado
+                // Restar al asignado porque aún no la ha completado y ya ha vencido (no futura)
                 if (t.getDueDate() != null && t.getDueDate().isBefore(now) && t.getAssignedTo() != null) {
                     UUID assignedId = t.getAssignedTo().getId();
                     pointsMap.computeIfPresent(assignedId, (k, v) -> v - t.getPoints());
@@ -265,5 +288,95 @@ public class HouseStatisticsService {
         }
 
         return pointsMap;
+    }
+
+    /**
+     * Calcula los puntos de tareas asignadas (lo que debe obtener si completa todo) por usuario para el mes indicado, o histórico total.
+     */
+    public Map<UUID, Integer> getAssignedKpiPoints(UUID houseId, UUID userId, YearMonth month) {
+        assertMember(houseId, userId);
+
+        List<HouseMember> members = houseMemberRepository.findByHouseId(houseId);
+        List<Task> allTasks = taskRepository.findByHouseIdAndDeletedAtIsNull(houseId);
+
+        Map<UUID, Integer> assignedMap = new HashMap<>();
+        members.stream()
+                .filter(HouseMember::isActive)
+                .forEach(m -> assignedMap.put(m.getUser().getId(), 0));
+
+        for (Task t : allTasks) {
+            if (t.getDueDate() == null) continue;
+            if (month != null && !YearMonth.from(t.getDueDate()).equals(month)) continue;
+
+            if (t.getAssignedTo() != null) {
+                UUID assignedId = t.getAssignedTo().getId();
+                assignedMap.computeIfPresent(assignedId, (k, v) -> v + t.getPoints());
+            }
+        }
+
+        return assignedMap;
+    }
+
+    /**
+     * Calcula la evolución mensual de puntos KPI por usuario activo en la casa.
+     */
+    public List<Map<String, Object>> getMonthlyKpiEvolution(UUID houseId, UUID userId) {
+        assertMember(houseId, userId);
+
+        List<HouseMember> members = houseMemberRepository.findByHouseId(houseId);
+        List<Task> allTasks = taskRepository.findByHouseIdAndDeletedAtIsNull(houseId);
+
+        Map<YearMonth, Map<UUID, Integer>> pointsByMonth = new TreeMap<>();
+        LocalDateTime now = LocalDateTime.now();
+
+        for (Task t : allTasks) {
+            LocalDateTime evaluationDate = t.getCompletedAt() != null ? t.getCompletedAt() : t.getDueDate();
+            if (evaluationDate == null) continue;
+            YearMonth ym = YearMonth.from(evaluationDate);
+
+            pointsByMonth.putIfAbsent(ym, new HashMap<>());
+            Map<UUID, Integer> monthPointsMap = pointsByMonth.get(ym);
+
+            // Inicializar a 0 para miembros activos
+            for (HouseMember m : members) {
+                if (m.isActive()) {
+                    monthPointsMap.putIfAbsent(m.getUser().getId(), 0);
+                }
+            }
+
+            if (t.getStatus() == TaskStatus.COMPLETED) {
+                if (t.getCompletedBy() == null) continue;
+                UUID rescuerId = t.getCompletedBy().getId();
+                UUID assignedId = t.getAssignedTo() != null ? t.getAssignedTo().getId() : null;
+
+                if (monthPointsMap.containsKey(rescuerId)) {
+                    monthPointsMap.put(rescuerId, monthPointsMap.get(rescuerId) + t.getPoints());
+                }
+                if (assignedId != null && !assignedId.equals(rescuerId)) {
+                    if (monthPointsMap.containsKey(assignedId)) {
+                        monthPointsMap.put(assignedId, monthPointsMap.get(assignedId) - t.getPoints());
+                    }
+                }
+            } else if (t.getStatus() == TaskStatus.PENDING) {
+                if (t.getDueDate() != null && t.getDueDate().isBefore(now) && t.getAssignedTo() != null) {
+                    UUID assignedId = t.getAssignedTo().getId();
+                    if (monthPointsMap.containsKey(assignedId)) {
+                        monthPointsMap.put(assignedId, monthPointsMap.get(assignedId) - t.getPoints());
+                    }
+                }
+            }
+        }
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Map.Entry<YearMonth, Map<UUID, Integer>> entry : pointsByMonth.entrySet()) {
+            Map<String, Object> monthData = new HashMap<>();
+            monthData.put("month", entry.getKey().toString()); // "YYYY-MM"
+            for (Map.Entry<UUID, Integer> userEntry : entry.getValue().entrySet()) {
+                monthData.put(userEntry.getKey().toString(), userEntry.getValue());
+            }
+            result.add(monthData);
+        }
+
+        return result;
     }
 }

@@ -259,7 +259,9 @@ export default function HouseDetail() {
                     : new Date().toISOString().split('.')[0],
             };
 
-            if (taskForm.rotationType === 'FIXED') {
+            if (editingTaskId) {
+                payload.assignedToId = taskForm.assignedToId || null;
+            } else if (taskForm.rotationType === 'FIXED') {
                 payload.assignedToId = taskForm.assignedToId || currentUserId;
             } else {
                 payload.participantIds = taskForm.participantIds;
@@ -317,7 +319,7 @@ export default function HouseDetail() {
         if (!taskId) return;
         try {
             const newDueDate = new Date(targetDateStr);
-            newDueDate.setHours(12, 0, 0, 0);
+            newDueDate.setHours(23, 59, 59, 0);
             const isoStr = newDueDate.toISOString().split('.')[0];
             await api.patch(`/tasks/${taskId}/due-date?dueDate=${isoStr}&userId=${currentUserId}`);
             fetchData();
@@ -565,33 +567,35 @@ export default function HouseDetail() {
                     margin: '0 auto',
                     padding: 'var(--space-8) var(--space-4)',
                     display: 'grid',
-                    gridTemplateColumns: '1fr 2fr',
+                    gridTemplateColumns: activeTab === 'stats' ? '1fr' : '1fr 2fr',
                     gap: 'var(--space-6)',
                 }}
             >
                 {/* Sidebar */}
-                <aside>
-                    <HouseSidebar
-                        members={house.members}
-                        memberStatuses={memberStatuses}
-                        sidebarView={sidebarView}
-                        onSidebarViewChange={setSidebarView}
-                        onRemoveMember={handleRemoveMember}
-                        currentUserId={currentUserId}
-                        isAdmin={selfIsAdmin}
-                        onColorChange={handleColorChange}
-                        onEditProfile={() => {
-                            setProfileFormData({
-                                username: currentUsername || '',
-                                profilePictureUrl: '',
-                            });
-                            setShowEditProfileModal(true);
-                        }}
-                        isReadOnly={house.isReadOnly}
-                        onRegisterDirectPayment={() => setShowDirectPaymentModal(true)}
-                        onToggleSettleApproval={handleToggleSettleApproval}
-                    />
-                </aside>
+                {activeTab !== 'stats' && (
+                    <aside>
+                        <HouseSidebar
+                            members={house.members}
+                            memberStatuses={memberStatuses}
+                            sidebarView={sidebarView}
+                            onSidebarViewChange={setSidebarView}
+                            onRemoveMember={handleRemoveMember}
+                            currentUserId={currentUserId}
+                            isAdmin={selfIsAdmin}
+                            onColorChange={handleColorChange}
+                            onEditProfile={() => {
+                                setProfileFormData({
+                                    username: currentUsername || '',
+                                    profilePictureUrl: '',
+                                });
+                                setShowEditProfileModal(true);
+                            }}
+                            isReadOnly={house.isReadOnly}
+                            onRegisterDirectPayment={() => setShowDirectPaymentModal(true)}
+                            onToggleSettleApproval={handleToggleSettleApproval}
+                        />
+                    </aside>
+                )}
 
                 {/* Contenido según Tab */}
                 <section>
@@ -673,7 +677,7 @@ export default function HouseDetail() {
 
                     {/* Panel de estadísticas */}
                     {activeTab === 'stats' && (
-                        <HouseStats houseId={houseId} members={house.members} />
+                        <HouseStats houseId={houseId} members={house.members} memberStatuses={memberStatuses} />
                     )}
                 </section>
             </main>

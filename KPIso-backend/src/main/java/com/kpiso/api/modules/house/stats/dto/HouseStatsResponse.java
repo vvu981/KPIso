@@ -12,6 +12,8 @@ public class HouseStatsResponse {
     private List<ExpenseDto> topExpenses;
     private ProductStatsDto productStats;
     private Map<UUID, Integer> taskKpiPoints;
+    private List<Map<String, Object>> monthlyKpiEvolution;
+    private Map<UUID, Integer> assignedKpiPoints;
 
     // Getters and Setters
     public Map<UUID, BigDecimal> getLivingCostPerMember() { return livingCostPerMember; }
@@ -24,4 +26,8 @@ public class HouseStatsResponse {
     public void setProductStats(ProductStatsDto productStats) { this.productStats = productStats; }
     public Map<UUID, Integer> getTaskKpiPoints() { return taskKpiPoints; }
     public void setTaskKpiPoints(Map<UUID, Integer> taskKpiPoints) { this.taskKpiPoints = taskKpiPoints; }
+    public List<Map<String, Object>> getMonthlyKpiEvolution() { return monthlyKpiEvolution; }
+    public void setMonthlyKpiEvolution(List<Map<String, Object>> monthlyKpiEvolution) { this.monthlyKpiEvolution = monthlyKpiEvolution; }
+    public Map<UUID, Integer> getAssignedKpiPoints() { return assignedKpiPoints; }
+    public void setAssignedKpiPoints(Map<UUID, Integer> assignedKpiPoints) { this.assignedKpiPoints = assignedKpiPoints; }
 }

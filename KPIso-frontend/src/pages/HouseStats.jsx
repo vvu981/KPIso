@@ -6,6 +6,9 @@ import MonthlyEvolutionChart from '../components/stats/MonthlyEvolutionChart';
 import TopExpensesTable from '../components/stats/TopExpensesTable';
 import TopProductsTable from '../components/stats/TopProductsTable';
 import ConvivenciaKpiChart from '../components/stats/ConvivenciaKpiChart';
+import MonthlyKpiChart from '../components/stats/MonthlyKpiChart';
+import { Card } from '../components/ui/Card.jsx';
+import { Badge } from '../components/ui/Badge.jsx';
 
 // ── Icono local ──────────────────────────────────────────────────────────────
 const IconPerson = () => (
@@ -57,7 +60,7 @@ function buildMonthOptions() {
  * Todos los datos monetarios excluyen DIRECT_PAYMENT (gestionado en el backend).
  * Sin caché: cada cambio de mes lanza una nueva petición.
  */
-export default function HouseStats({ houseId, members = [] }) {
+export default function HouseStats({ houseId, members = [], memberStatuses = {} }) {
     const authContext = useContext(AuthContext);
 
     // Selector de mes — por defecto el mes actual ('YYYY-MM')
@@ -77,7 +80,7 @@ export default function HouseStats({ houseId, members = [] }) {
         members.forEach((m) => {
             // userId es el campo del User; id sería el del HouseMember si se expone
             if (m.userId) map[m.userId] = m.username;
-            if (m.id)     map[m.id]     = m.username;
+            if (m.id) map[m.id] = m.username;
         });
         return map;
     }, [members]);
@@ -91,10 +94,11 @@ export default function HouseStats({ houseId, members = [] }) {
 
     // ── Extraer y normalizar los campos del DTO del backend ──────────────────
     const livingCostPerMember = data?.livingCostPerMember ?? {};   // Map<UUID, BigDecimal>
-    const monthlyEvolution    = data?.monthlyExpenseEvolution ?? []; // [{ month, total }]
-    const topExpenses         = data?.topExpenses ?? [];             // [{ id, description, amount, date, memberId }]
-    const productStats        = data?.productStats ?? {};            // { topFrequentProducts, topExpensiveProducts }
-    const taskKpiPoints       = data?.taskKpiPoints ?? {};           // Map<UUID, Integer>
+    const monthlyEvolution = data?.monthlyExpenseEvolution ?? []; // [{ month, total }]
+    const topExpenses = data?.topExpenses ?? [];             // [{ id, description, amount, date, memberId }]
+    const productStats = data?.productStats ?? {};            // { topFrequentProducts, topExpensiveProducts }
+    const taskKpiPoints = data?.taskKpiPoints ?? {};           // Map<UUID, Integer>
+    const monthlyKpiEvolution = data?.monthlyKpiEvolution ?? [];
 
     // 1. Coste de vida — enriquecido con nombre del miembro
     const memberCostEntries = Object.entries(livingCostPerMember).map(([memberId, amount]) => ({
@@ -109,77 +113,28 @@ export default function HouseStats({ houseId, members = [] }) {
         memberName: resolveName(e.memberId),
     }));
 
-    // 5. KPI — enriquecido con nombre del miembro, ordenado descendente
+    const assignedKpiPoints = data?.assignedKpiPoints ?? {};
+
+    // 5. KPI Combinado — enriquecido con nombre del miembro, ordenado descendente por puntos conseguidos
     const kpiData = Object.entries(taskKpiPoints)
         .map(([memberId, points]) => ({
             memberId,
             username: resolveName(memberId),
-            points: Number(points),
+            puntosLleva: Number(points),
+            puntosDebe: Number(assignedKpiPoints[memberId] ?? 0),
         }))
-        .sort((a, b) => b.points - a.points);
+        .sort((a, b) => b.puntosLleva - a.puntosLleva);
 
     // ── Render ───────────────────────────────────────────────────────────────
     return (
-        <section
+        <Card
+            padding="lg"
             style={{
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 'var(--space-6)',
-                padding: 'var(--space-4)',
             }}
         >
-            {/* ── Cabecera con selector de mes ─────────────────────────────── */}
-            <div
-                style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 'var(--space-4)',
-                    flexWrap: 'wrap',
-                }}
-            >
-                <h2
-                    style={{
-                        margin: 0,
-                        fontSize: 'var(--text-xl)',
-                        fontWeight: 'var(--font-bold)',
-                        color: 'var(--text-primary)',
-                    }}
-                >
-                    Estadísticas de la casa
-                </h2>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginLeft: 'auto' }}>
-                    <label
-                        htmlFor="houseStats-monthSelect"
-                        style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}
-                    >
-                        Período:
-                    </label>
-                    <select
-                        id="houseStats-monthSelect"
-                        value={selectedMonth}
-                        onChange={(e) => setSelectedMonth(e.target.value)}
-                        style={{
-                            padding: 'var(--space-2) var(--space-3)',
-                            borderRadius: 'var(--radius-md)',
-                            border: '1px solid var(--glass-border)',
-                            background: 'var(--glass-bg)',
-                            color: 'var(--text-primary)',
-                            fontSize: 'var(--text-sm)',
-                            cursor: 'pointer',
-                            backdropFilter: 'var(--glass-blur)',
-                            outline: 'none',
-                        }}
-                    >
-                        {monthOptions.map((opt) => (
-                            <option key={opt.value} value={opt.value} style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)' }}>
-                                {opt.label}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-            </div>
-
             {/* ── Estado de carga ──────────────────────────────────────────── */}
             {loading && (
                 <div style={{ textAlign: 'center', padding: 'var(--space-12)', color: 'var(--text-secondary)' }}>
@@ -205,6 +160,109 @@ export default function HouseStats({ houseId, members = [] }) {
             {/* ── Contenido (solo cuando hay datos) ───────────────────────── */}
             {!loading && !error && data && (
                 <>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
+                        <h2
+                            style={{
+                                margin: 0,
+                                fontSize: 'var(--text-xl)',
+                                fontWeight: 'var(--font-bold)',
+                                color: 'var(--text-primary)',
+                            }}
+                        >
+                            Estadísticas de la casa
+                        </h2>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginLeft: 'auto' }}>
+                            <label
+                                htmlFor="houseStats-monthSelect"
+                                style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}
+                            >
+                                Período:
+                            </label>
+                            <select
+                                id="houseStats-monthSelect"
+                                value={selectedMonth}
+                                onChange={(e) => setSelectedMonth(e.target.value)}
+                                style={{
+                                    padding: 'var(--space-2) var(--space-3)',
+                                    borderRadius: 'var(--radius-md)',
+                                    border: '1px solid var(--glass-border)',
+                                    background: 'var(--glass-bg)',
+                                    color: 'var(--text-primary)',
+                                    fontSize: 'var(--text-sm)',
+                                    cursor: 'pointer',
+                                    backdropFilter: 'var(--glass-blur)',
+                                    outline: 'none',
+                                }}
+                            >
+                                {monthOptions.map((opt) => (
+                                    <option key={opt.value} value={opt.value} style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)' }}>
+                                        {opt.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Resumen de Convivientes (Balance y Puntos) */}
+                    <div>
+                        <h3 style={sectionTitleStyle}>Resumen de Convivientes</h3>
+                        <div
+                            style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                                gap: 'var(--space-3)',
+                            }}
+                        >
+                            {members.map((member) => {
+                                const status = memberStatuses[member.userId] || { balance: 0, color: '#6366f1', points: 0 };
+                                return (
+                                    <div
+                                        key={member.userId}
+                                        style={{
+                                            ...glassCardStyle,
+                                            alignItems: 'stretch',
+                                            textAlign: 'left',
+                                            padding: 'var(--space-4)',
+                                        }}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
+                                            <div
+                                                style={{
+                                                    width: 12,
+                                                    height: 12,
+                                                    borderRadius: '50%',
+                                                    backgroundColor: status.color,
+                                                    boxShadow: `0 0 8px ${status.color}40`,
+                                                }}
+                                            />
+                                            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-bold)', color: 'var(--text-primary)' }}>
+                                                {member.username}
+                                            </span>
+                                            {member.role === 'ADMIN' && (
+                                                <Badge variant="primary" size="xs">
+                                                    Admin
+                                                </Badge>
+                                            )}
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
+                                            <span>Balance:</span>
+                                            <span style={{ fontWeight: 'var(--font-bold)', color: status.balance >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                                                {status.balance > 0 ? '+' : ''}{status.balance.toFixed(2)}€
+                                            </span>
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', marginTop: 'var(--space-1)' }}>
+                                            <span>Puntos KPI:</span>
+                                            <span style={{ fontWeight: 'var(--font-bold)', color: 'var(--success)' }}>
+                                                {status.points} pts
+                                            </span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
                     {/* 1. Coste de vida por persona */}
                     <div>
                         <h3 style={sectionTitleStyle}>Coste de vida por persona</h3>
@@ -310,12 +368,12 @@ export default function HouseStats({ houseId, members = [] }) {
                                 padding: 'var(--space-4)',
                             }}
                         >
-                            <ConvivenciaKpiChart data={kpiData} />
+                            <ConvivenciaKpiChart data={kpiData} memberStatuses={memberStatuses} />
                         </div>
                     </div>
                 </>
             )}
-        </section>
+        </Card>
     );
 }
 
