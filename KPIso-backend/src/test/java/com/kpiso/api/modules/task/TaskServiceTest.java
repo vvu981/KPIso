@@ -211,7 +211,8 @@ class TaskServiceTest {
         List<TaskResponse> responses = taskService.createTask(request);
 
         assertEquals(2, responses.size());
-        assertEquals(request.getStartDate().with(java.time.LocalTime.of(23, 59, 59)).plusMonths(1), responses.get(1).getDueDate());
+        assertEquals(TestFixtures.localDateTime(2026, 5, 31, 23, 59).withSecond(59), responses.get(0).getDueDate());
+        assertEquals(TestFixtures.localDateTime(2026, 6, 30, 23, 59).withSecond(59), responses.get(1).getDueDate());
     }
 
     @Test
@@ -392,7 +393,7 @@ class TaskServiceTest {
                 .description("Original")
                 .points(3)
                 .status(TaskStatus.PENDING)
-                .rotationType(RotationType.DAILY)
+                .rotationType(RotationType.FIXED)
                 .dueDate(TestFixtures.localDateTime(2026, 5, 10, 9, 0))
                 .house(house)
                 .assignedTo(assignee)
@@ -402,7 +403,7 @@ class TaskServiceTest {
                 .title("Limpiar otra vez")
                 .description("Actualizada")
                 .points(5)
-                .rotationType(RotationType.MONTHLY)
+                .rotationType(RotationType.FIXED)
                 .build();
 
         when(taskRepository.findById(task.getId())).thenReturn(Optional.of(task));
