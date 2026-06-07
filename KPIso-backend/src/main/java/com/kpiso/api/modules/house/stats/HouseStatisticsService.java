@@ -17,6 +17,8 @@ import jakarta.transaction.Transactional;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
+import com.kpiso.api.modules.user.User;
+import java.math.RoundingMode;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
@@ -54,8 +56,8 @@ public class HouseStatisticsService {
     // ── 1. Coste de vida por persona ──────────────────────────────────────────
 
     /**
-     * Suma el importe de cada gasto (excluye pagos directos, identificados
-     * por títulos que empiezan con "Liquidación:") por usuario que pagó.
+     * Suma la parte correspondiente de cada gasto (excluye pagos directos, identificados
+     * por títulos que empiezan con "Liquidación:") por usuario participante.
      * Los gastos liquidados (settled=true) también se incluyen para reflejar
      * el coste histórico real.
      */
@@ -81,11 +83,42 @@ public class HouseStatisticsService {
                 if (!expenseMonth.equals(month)) continue;
             }
 
-            UUID payerId = e.getPaidBy().getId();
-            costPerMember.merge(payerId, e.getAmount(), BigDecimal::add);
+            Map<UUID, BigDecimal> splits = calculateSplits(e);
+            for (Map.Entry<UUID, BigDecimal> entry : splits.entrySet()) {
+                UUID participantId = entry.getKey();
+                BigDecimal amount = entry.getValue();
+                if (costPerMember.containsKey(participantId)) {
+                    costPerMember.merge(participantId, amount, BigDecimal::add);
+                }
+            }
         }
 
         return costPerMember;
+    }
+
+    private Map<UUID, BigDecimal> calculateSplits(Expense e) {
+        Map<UUID, BigDecimal> splits = new HashMap<>();
+        if (e.getExactSplits() != null && !e.getExactSplits().isEmpty()) {
+            return e.getExactSplits();
+        }
+
+        List<User> participants = e.getParticipants();
+        int numParticipants = participants.size();
+        if (numParticipants == 0) {
+            return splits;
+        }
+
+        long totalCents = e.getAmount().movePointRight(2).setScale(0, RoundingMode.HALF_UP).longValue();
+        long baseShareCents = totalCents / numParticipants;
+        long remainderCents = totalCents % numParticipants;
+
+        for (int i = 0; i < numParticipants; i++) {
+            long cents = baseShareCents + (i < remainderCents ? 1 : 0);
+            BigDecimal share = BigDecimal.valueOf(cents).movePointLeft(2);
+            splits.put(participants.get(i).getId(), share);
+        }
+
+        return splits;
     }
 
     // ── 2. Evolución mensual de gastos ────────────────────────────────────────

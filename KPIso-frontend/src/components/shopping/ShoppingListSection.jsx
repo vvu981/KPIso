@@ -450,32 +450,40 @@ export default function ShoppingListSection({ houseId, currentUserId, onPurchase
         setSuccess(null);
         setShowSuggestions(false);
         try {
-            const payload = {
-                productName: productName,
-                houseId: houseId,
-                addedById: currentUserId,
-                assignedUserIds: [],
-                isManual: manualMode,
-                quantity: manualMode ? parseInt(manualQuantity || 1, 10) : 1
-            };
-            if (manualMode && manualPrice && !isNaN(parseFloat(manualPrice))) {
-                payload.manualPrice = parseFloat(manualPrice);
+            const qty = manualMode ? parseInt(manualQuantity || 1, 10) : 1;
+            const addedItems = [];
+
+            for (let i = 0; i < qty; i++) {
+                const payload = {
+                    productName: productName,
+                    houseId: houseId,
+                    addedById: currentUserId,
+                    assignedUserIds: [],
+                    isManual: manualMode,
+                    quantity: 1
+                };
+                if (manualMode && manualPrice && !isNaN(parseFloat(manualPrice))) {
+                    payload.manualPrice = parseFloat(manualPrice);
+                }
+
+                const response = await api.post('/shopping-list/add', payload, {
+                    headers: token ? { Authorization: `Bearer ${token}` } : {}
+                });
+                addedItems.push(response.data);
             }
 
-            const response = await api.post('/shopping-list/add', payload, {
-                headers: token ? { Authorization: `Bearer ${token}` } : {}
-            });
             setShoppingList(prev => ({
                 ...prev,
-                pendingItems: [response.data, ...prev.pendingItems],
-                estimatedBudget: prev.estimatedBudget + (response.data.estimatedPrice || 0)
+                pendingItems: [...addedItems.reverse(), ...prev.pendingItems],
+                estimatedBudget: prev.estimatedBudget + addedItems.reduce((sum, item) => sum + (item.estimatedPrice || 0), 0)
             }));
             setProductInput('');
             setManualName('');
             setManualPrice('');
             setManualQuantity(1);
             setManualMode(false);
-            setSuccess(`Producto añadido a la lista`);
+            const label = qty > 1 ? `${qty}× ${productName}` : productName;
+            setSuccess(`"${label}" añadido a la lista`);
             setTimeout(() => setSuccess(null), 3000);
         } catch (err) {
             console.error('Error al añadir producto:', err);

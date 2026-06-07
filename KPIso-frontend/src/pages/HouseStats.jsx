@@ -6,6 +6,7 @@ import MonthlyEvolutionChart from '../components/stats/MonthlyEvolutionChart';
 import TopExpensesTable from '../components/stats/TopExpensesTable';
 import TopProductsTable from '../components/stats/TopProductsTable';
 import ConvivenciaKpiChart from '../components/stats/ConvivenciaKpiChart';
+import { Card } from '../components/ui/Card.jsx';
 
 // ── Icono local ──────────────────────────────────────────────────────────────
 const IconPerson = () => (
@@ -204,7 +205,14 @@ export default function HouseStats({ houseId, members = [] }) {
 
             {/* ── Contenido (solo cuando hay datos) ───────────────────────── */}
             {!loading && !error && data && (
-                <>
+                <Card
+                    style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 'var(--space-6)',
+                        padding: 'var(--space-6)',
+                    }}
+                >
                     {/* 1. Coste de vida por persona */}
                     <div>
                         <h3 style={sectionTitleStyle}>Coste de vida por persona</h3>
@@ -313,7 +321,7 @@ export default function HouseStats({ houseId, members = [] }) {
                             <ConvivenciaKpiChart data={kpiData} />
                         </div>
                     </div>
-                </>
+                </Card>
             )}
         </section>
     );
