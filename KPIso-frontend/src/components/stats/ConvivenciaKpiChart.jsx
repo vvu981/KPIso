@@ -7,18 +7,14 @@ import {
     CartesianGrid,
     ResponsiveContainer,
     Cell,
+    Legend
 } from 'recharts';
 
 /**
- * ConvivenciaKpiChart — Gráfico de barras horizontales con los puntos KPI de cada usuario.
- *
- * Props:
- *   data: Array de { username: string, points: number }
- *         (pre-procesado en HouseStats: se fusionan members + taskKpiPoints del backend)
- *
- * Usa variables CSS globales para adaptarse automáticamente al modo oscuro/claro.
+ * ConvivenciaKpiChart — Gráfico de barras horizontales agrupadas con los puntos KPI
+ * obtenidos vs asignados de cada usuario.
  */
-export default function ConvivenciaKpiChart({ data = [] }) {
+export default function ConvivenciaKpiChart({ data = [], memberStatuses = {} }) {
     if (data.length === 0) {
         return (
             <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: 'var(--space-8)' }}>
@@ -27,14 +23,80 @@ export default function ConvivenciaKpiChart({ data = [] }) {
         );
     }
 
-    // Paleta basada en el acento con variaciones de opacidad para distinguir barras
     const COLORS = [
         'var(--accent)',
-        'var(--accent-soft, var(--accent))',
-        'var(--success, #34d399)',
-        'var(--warning, #fbbf24)',
-        'var(--danger, #f87171)',
+        'var(--cyan, #06b6d4)',
+        'var(--success, #10b981)',
+        'var(--warning, #f59e0b)',
+        'var(--danger, #ef4444)',
     ];
+
+    // Tooltip personalizado para mostrar la comparación de forma clara
+    const CustomTooltip = ({ active, payload, label }) => {
+        if (active && payload && payload.length) {
+            const obtenidos = payload.find(p => p.dataKey === 'puntosLleva')?.value ?? 0;
+            const asignados = payload.find(p => p.dataKey === 'puntosDebe')?.value ?? 0;
+            const porcentaje = asignados > 0 ? Math.round((obtenidos / asignados) * 100) : 0;
+
+            return (
+                <div
+                    style={{
+                        background: 'var(--bg-glass)',
+                        border: '1px solid var(--border-subtle)',
+                        borderRadius: 'var(--radius-md)',
+                        padding: 'var(--space-3)',
+                        backdropFilter: 'blur(12px)',
+                        color: 'var(--text-primary)',
+                        fontSize: '13px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px'
+                    }}
+                >
+                    <div style={{ fontWeight: 'var(--font-bold)', marginBottom: '4px' }}>{label}</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-4)' }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>Obtenidos:</span>
+                        <span style={{ fontWeight: 'var(--font-semibold)' }}>{obtenidos} pts</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-4)' }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>Asignados:</span>
+                        <span style={{ fontWeight: 'var(--font-semibold)' }}>{asignados} pts</span>
+                    </div>
+                    {asignados > 0 && (
+                        <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '4px', marginTop: '4px', fontSize: '11px', color: 'var(--accent-light)' }}>
+                            Progreso: {porcentaje}% completado
+                        </div>
+                    )}
+                </div>
+            );
+        }
+        return null;
+    };
+
+    const renderCustomLegend = (props) => {
+        const { payload } = props;
+        return (
+            <div style={{ display: 'flex', gap: 'var(--space-4)', justifyContent: 'center', marginTop: 'var(--space-2)', flexWrap: 'wrap' }}>
+                {payload.map((entry, index) => {
+                    const isObtenidos = entry.dataKey === 'puntosLleva';
+                    return (
+                        <div key={`item-${index}`} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                            <svg width="24" height="8" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
+                                {isObtenidos ? (
+                                    <line x1="0" y1="4" x2="24" y2="4" stroke="var(--accent)" strokeWidth="4" />
+                                ) : (
+                                    <line x1="0" y1="4" x2="24" y2="4" stroke="var(--accent)" strokeWidth="4" strokeDasharray="4 2" />
+                                )}
+                            </svg>
+                            <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-bold)', color: 'var(--text-secondary)' }}>
+                                {entry.value}
+                            </span>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    };
 
     return (
         <ResponsiveContainer width="100%" height="100%">
@@ -42,6 +104,7 @@ export default function ConvivenciaKpiChart({ data = [] }) {
                 data={data}
                 layout="vertical"
                 margin={{ top: 8, right: 40, left: 8, bottom: 8 }}
+                barGap={2}
             >
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" horizontal={false} />
                 <XAxis
@@ -49,36 +112,53 @@ export default function ConvivenciaKpiChart({ data = [] }) {
                     stroke="var(--text-secondary)"
                     tick={{ fontSize: 12, fill: 'var(--text-secondary)' }}
                     allowDecimals={false}
-                    label={{
-                        value: 'Puntos KPI',
-                        position: 'insideBottom',
-                        offset: -4,
-                        fill: 'var(--text-secondary)',
-                        fontSize: 12,
-                    }}
                 />
                 <YAxis
                     type="category"
                     dataKey="username"
                     stroke="var(--text-secondary)"
                     tick={{ fontSize: 13, fill: 'var(--text-primary)' }}
-                    width={120}
+                    width={100}
                 />
-                <Tooltip
-                    formatter={(value) => [`${value} pts`, 'Puntos KPI']}
-                    labelFormatter={(label) => `Usuario: ${label}`}
-                    contentStyle={{
-                        background: 'var(--bg-glass)',
-                        border: '1px solid var(--border-subtle)',
-                        borderRadius: 'var(--radius-md)',
-                        color: 'var(--text-primary)',
-                        backdropFilter: 'blur(12px)',
-                    }}
-                />
-                <Bar dataKey="points" radius={[0, 4, 4, 0]} maxBarSize={40}>
-                    {data.map((_, idx) => (
-                        <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
-                    ))}
+                <Tooltip content={<CustomTooltip />} />
+                <Legend content={renderCustomLegend} />
+                 <Bar 
+                    dataKey="puntosLleva" 
+                    name="Puntos Obtenidos" 
+                    fill="var(--accent)"
+                    stroke="var(--accent)"
+                    strokeWidth={1.5}
+                    radius={[0, 4, 4, 0]} 
+                    maxBarSize={15}
+                >
+                    {data.map((entry, idx) => {
+                        const color = memberStatuses[entry.memberId]?.color || COLORS[idx % COLORS.length];
+                        return <Cell key={idx} fill={color} stroke={color} strokeWidth={1.5} />;
+                    })}
+                </Bar>
+                <Bar 
+                    dataKey="puntosDebe" 
+                    name="Puntos Asignados" 
+                    fill="var(--accent-ultra-light)"
+                    stroke="var(--accent)"
+                    strokeWidth={1.5}
+                    strokeDasharray="3 2"
+                    radius={[0, 4, 4, 0]} 
+                    maxBarSize={15}
+                >
+                    {data.map((entry, idx) => {
+                        const color = memberStatuses[entry.memberId]?.color || COLORS[idx % COLORS.length];
+                        return (
+                            <Cell 
+                                key={idx} 
+                                fill={color} 
+                                fillOpacity={0.25} 
+                                stroke={color} 
+                                strokeWidth={1.5}
+                                strokeDasharray="3 2"
+                            />
+                        );
+                    })}
                 </Bar>
             </BarChart>
         </ResponsiveContainer>

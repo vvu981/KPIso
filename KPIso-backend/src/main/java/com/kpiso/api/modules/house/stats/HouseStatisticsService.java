@@ -259,14 +259,13 @@ public class HouseStatisticsService {
                 .filter(HouseMember::isActive)
                 .forEach(m -> pointsMap.put(m.getUser().getId(), 0));
 
-        YearMonth targetMonth = (month != null) ? month : YearMonth.now();
         LocalDateTime now = LocalDateTime.now();
 
         for (Task t : allTasks) {
             // Determinar la fecha de referencia para filtrar por mes
             LocalDateTime evaluationDate = t.getCompletedAt() != null ? t.getCompletedAt() : t.getDueDate();
             if (evaluationDate == null) continue;
-            if (!YearMonth.from(evaluationDate).equals(targetMonth)) continue;
+            if (month != null && !YearMonth.from(evaluationDate).equals(month)) continue;
 
             if (t.getStatus() == TaskStatus.COMPLETED) {
                 if (t.getCompletedBy() == null) continue;
@@ -298,5 +297,107 @@ public class HouseStatisticsService {
         }
 
         return pointsMap;
+    }
+
+    /**
+     * Calcula los puntos de tareas asignadas (lo que debe obtener si completa todo) por usuario para el mes indicado, o histórico total.
+     */
+    public Map<UUID, Integer> getAssignedKpiPoints(UUID houseId, UUID userId, YearMonth month) {
+        assertMember(houseId, userId);
+
+        List<HouseMember> members = houseMemberRepository.findByHouseId(houseId);
+        List<Task> allTasks = taskRepository.findByHouseIdAndDeletedAtIsNull(houseId);
+
+        Map<UUID, Integer> assignedMap = new HashMap<>();
+        members.stream()
+                .filter(HouseMember::isActive)
+                .forEach(m -> assignedMap.put(m.getUser().getId(), 0));
+
+        for (Task t : allTasks) {
+            if (t.getDueDate() == null) continue;
+            if (month != null && !YearMonth.from(t.getDueDate()).equals(month)) continue;
+
+            if (t.getAssignedTo() != null) {
+                UUID assignedId = t.getAssignedTo().getId();
+                assignedMap.computeIfPresent(assignedId, (k, v) -> v + t.getPoints());
+            }
+        }
+
+        return assignedMap;
+    }
+
+    /**
+     * Calcula la evolución mensual de puntos KPI por usuario activo en la casa.
+     */
+    public List<Map<String, Object>> getMonthlyKpiEvolution(UUID houseId, UUID userId) {
+        assertMember(houseId, userId);
+
+        List<HouseMember> members = houseMemberRepository.findByHouseId(houseId);
+        List<Task> allTasks = taskRepository.findByHouseIdAndDeletedAtIsNull(houseId);
+
+        Map<YearMonth, Map<UUID, Integer>> pointsByMonth = new TreeMap<>();
+        LocalDateTime now = LocalDateTime.now();
+
+        for (Task t : allTasks) {
+            LocalDateTime evaluationDate = t.getCompletedAt() != null ? t.getCompletedAt() : t.getDueDate();
+            if (evaluationDate == null) continue;
+            YearMonth ym = YearMonth.from(evaluationDate);
+
+            pointsByMonth.putIfAbsent(ym, new HashMap<>());
+            Map<UUID, Integer> monthPointsMap = pointsByMonth.get(ym);
+
+            // Inicializar a 0 para miembros activos
+            for (HouseMember m : members) {
+                if (m.isActive()) {
+                    monthPointsMap.putIfAbsent(m.getUser().getId(), 0);
+                }
+            }
+
+            if (t.getStatus() == TaskStatus.COMPLETED) {
+                if (t.getCompletedBy() == null) continue;
+
+                UUID rescuerId  = t.getCompletedBy().getId();
+                UUID assignedId = t.getAssignedTo() != null ? t.getAssignedTo().getId() : null;
+
+                boolean lateRescue = assignedId != null
+                        && !assignedId.equals(rescuerId)
+                        && t.getDueDate() != null
+                        && t.getCompletedAt() != null
+                        && t.getCompletedAt().isAfter(t.getDueDate());
+
+                if (lateRescue) {
+                    if (monthPointsMap.containsKey(rescuerId)) {
+                        monthPointsMap.put(rescuerId, monthPointsMap.get(rescuerId) + t.getPoints());
+                    }
+                    if (assignedId != null && monthPointsMap.containsKey(assignedId)) {
+                        monthPointsMap.put(assignedId, monthPointsMap.get(assignedId) - t.getPoints());
+                    }
+                } else {
+                    if (monthPointsMap.containsKey(rescuerId)) {
+                        monthPointsMap.put(rescuerId, monthPointsMap.get(rescuerId) + t.getPoints());
+                    }
+                }
+
+            } else if (t.getStatus() == TaskStatus.PENDING) {
+                if (t.getDueDate() != null && t.getDueDate().isBefore(now) && t.getAssignedTo() != null) {
+                    UUID assignedId = t.getAssignedTo().getId();
+                    if (monthPointsMap.containsKey(assignedId)) {
+                        monthPointsMap.put(assignedId, monthPointsMap.get(assignedId) - t.getPoints());
+                    }
+                }
+            }
+        }
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Map.Entry<YearMonth, Map<UUID, Integer>> entry : pointsByMonth.entrySet()) {
+            Map<String, Object> monthData = new HashMap<>();
+            monthData.put("month", entry.getKey().toString()); // "YYYY-MM"
+            for (Map.Entry<UUID, Integer> userEntry : entry.getValue().entrySet()) {
+                monthData.put(userEntry.getKey().toString(), userEntry.getValue());
+            }
+            result.add(monthData);
+        }
+
+        return result;
     }
 }

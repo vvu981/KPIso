@@ -97,6 +97,8 @@ public class HouseController {
             response.setTopExpenses(houseStatisticsService.getTopExpenses(houseId, userId, 10, ym));
             response.setProductStats(houseStatisticsService.getProductPurchaseStats(houseId, userId));
             response.setTaskKpiPoints(houseStatisticsService.getTaskKpiPoints(houseId, userId, ym));
+            response.setMonthlyKpiEvolution(houseStatisticsService.getMonthlyKpiEvolution(houseId, userId));
+            response.setAssignedKpiPoints(houseStatisticsService.getAssignedKpiPoints(houseId, userId, ym));
             return ResponseEntity.ok(response);
         } catch (org.springframework.security.access.AccessDeniedException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();

@@ -6,6 +6,7 @@ import MonthlyEvolutionChart from '../components/stats/MonthlyEvolutionChart';
 import TopExpensesTable from '../components/stats/TopExpensesTable';
 import TopProductsTable from '../components/stats/TopProductsTable';
 import ConvivenciaKpiChart from '../components/stats/ConvivenciaKpiChart';
+import MonthlyKpiChart from '../components/stats/MonthlyKpiChart';
 import { Card } from '../components/ui/Card.jsx';
 import { Badge } from '../components/ui/Badge.jsx';
 
@@ -97,6 +98,7 @@ export default function HouseStats({ houseId, members = [], memberStatuses = {} 
     const topExpenses = data?.topExpenses ?? [];             // [{ id, description, amount, date, memberId }]
     const productStats = data?.productStats ?? {};            // { topFrequentProducts, topExpensiveProducts }
     const taskKpiPoints = data?.taskKpiPoints ?? {};           // Map<UUID, Integer>
+    const monthlyKpiEvolution = data?.monthlyKpiEvolution ?? [];
 
     // 1. Coste de vida — enriquecido con nombre del miembro
     const memberCostEntries = Object.entries(livingCostPerMember).map(([memberId, amount]) => ({
@@ -111,14 +113,17 @@ export default function HouseStats({ houseId, members = [], memberStatuses = {} 
         memberName: resolveName(e.memberId),
     }));
 
-    // 5. KPI — enriquecido con nombre del miembro, ordenado descendente
+    const assignedKpiPoints = data?.assignedKpiPoints ?? {};
+
+    // 5. KPI Combinado — enriquecido con nombre del miembro, ordenado descendente por puntos conseguidos
     const kpiData = Object.entries(taskKpiPoints)
         .map(([memberId, points]) => ({
             memberId,
             username: resolveName(memberId),
-            points: Number(points),
+            puntosLleva: Number(points),
+            puntosDebe: Number(assignedKpiPoints[memberId] ?? 0),
         }))
-        .sort((a, b) => b.points - a.points);
+        .sort((a, b) => b.puntosLleva - a.puntosLleva);
 
     // ── Render ───────────────────────────────────────────────────────────────
     return (
@@ -363,7 +368,7 @@ export default function HouseStats({ houseId, members = [], memberStatuses = {} 
                                 padding: 'var(--space-4)',
                             }}
                         >
-                            <ConvivenciaKpiChart data={kpiData} />
+                            <ConvivenciaKpiChart data={kpiData} memberStatuses={memberStatuses} />
                         </div>
                     </div>
                 </>
