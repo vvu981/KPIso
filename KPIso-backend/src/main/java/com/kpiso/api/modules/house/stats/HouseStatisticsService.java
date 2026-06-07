@@ -262,33 +262,24 @@ public class HouseStatisticsService {
         LocalDateTime now = LocalDateTime.now();
 
         for (Task t : allTasks) {
-            // Determinar la fecha de referencia para filtrar por mes
             LocalDateTime evaluationDate = t.getCompletedAt() != null ? t.getCompletedAt() : t.getDueDate();
             if (evaluationDate == null) continue;
             if (month != null && !YearMonth.from(evaluationDate).equals(month)) continue;
 
             if (t.getStatus() == TaskStatus.COMPLETED) {
                 if (t.getCompletedBy() == null) continue;
-
-                UUID rescuerId  = t.getCompletedBy().getId();
+                UUID rescuerId = t.getCompletedBy().getId();
                 UUID assignedId = t.getAssignedTo() != null ? t.getAssignedTo().getId() : null;
 
-                // Otro usuario completó la tarea fuera del plazo del asignado
-                boolean lateRescue = assignedId != null
-                        && !assignedId.equals(rescuerId)
-                        && t.getDueDate() != null
-                        && t.getCompletedAt() != null
-                        && t.getCompletedAt().isAfter(t.getDueDate());
+                // Sumar al que completó la tarea (sea suya o un rescate)
+                pointsMap.computeIfPresent(rescuerId, (k, v) -> v + t.getPoints());
 
-                if (lateRescue) {
-                    pointsMap.computeIfPresent(rescuerId,  (k, v) -> v + t.getPoints());
+                // Si la completó otro, restar al asignado original por no haberla completado él
+                if (assignedId != null && !assignedId.equals(rescuerId)) {
                     pointsMap.computeIfPresent(assignedId, (k, v) -> v - t.getPoints());
-                } else {
-                    pointsMap.computeIfPresent(rescuerId,  (k, v) -> v + t.getPoints());
                 }
-
             } else if (t.getStatus() == TaskStatus.PENDING) {
-                // Tarea pendiente vencida con asignado
+                // Restar al asignado porque aún no la ha completado y ya ha vencido (no futura)
                 if (t.getDueDate() != null && t.getDueDate().isBefore(now) && t.getAssignedTo() != null) {
                     UUID assignedId = t.getAssignedTo().getId();
                     pointsMap.computeIfPresent(assignedId, (k, v) -> v - t.getPoints());
@@ -355,29 +346,17 @@ public class HouseStatisticsService {
 
             if (t.getStatus() == TaskStatus.COMPLETED) {
                 if (t.getCompletedBy() == null) continue;
-
-                UUID rescuerId  = t.getCompletedBy().getId();
+                UUID rescuerId = t.getCompletedBy().getId();
                 UUID assignedId = t.getAssignedTo() != null ? t.getAssignedTo().getId() : null;
 
-                boolean lateRescue = assignedId != null
-                        && !assignedId.equals(rescuerId)
-                        && t.getDueDate() != null
-                        && t.getCompletedAt() != null
-                        && t.getCompletedAt().isAfter(t.getDueDate());
-
-                if (lateRescue) {
-                    if (monthPointsMap.containsKey(rescuerId)) {
-                        monthPointsMap.put(rescuerId, monthPointsMap.get(rescuerId) + t.getPoints());
-                    }
-                    if (assignedId != null && monthPointsMap.containsKey(assignedId)) {
+                if (monthPointsMap.containsKey(rescuerId)) {
+                    monthPointsMap.put(rescuerId, monthPointsMap.get(rescuerId) + t.getPoints());
+                }
+                if (assignedId != null && !assignedId.equals(rescuerId)) {
+                    if (monthPointsMap.containsKey(assignedId)) {
                         monthPointsMap.put(assignedId, monthPointsMap.get(assignedId) - t.getPoints());
                     }
-                } else {
-                    if (monthPointsMap.containsKey(rescuerId)) {
-                        monthPointsMap.put(rescuerId, monthPointsMap.get(rescuerId) + t.getPoints());
-                    }
                 }
-
             } else if (t.getStatus() == TaskStatus.PENDING) {
                 if (t.getDueDate() != null && t.getDueDate().isBefore(now) && t.getAssignedTo() != null) {
                     UUID assignedId = t.getAssignedTo().getId();

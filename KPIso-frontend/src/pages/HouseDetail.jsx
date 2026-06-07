@@ -259,7 +259,9 @@ export default function HouseDetail() {
                     : new Date().toISOString().split('.')[0],
             };
 
-            if (taskForm.rotationType === 'FIXED') {
+            if (editingTaskId) {
+                payload.assignedToId = taskForm.assignedToId || null;
+            } else if (taskForm.rotationType === 'FIXED') {
                 payload.assignedToId = taskForm.assignedToId || currentUserId;
             } else {
                 payload.participantIds = taskForm.participantIds;
@@ -317,7 +319,7 @@ export default function HouseDetail() {
         if (!taskId) return;
         try {
             const newDueDate = new Date(targetDateStr);
-            newDueDate.setHours(12, 0, 0, 0);
+            newDueDate.setHours(23, 59, 59, 0);
             const isoStr = newDueDate.toISOString().split('.')[0];
             await api.patch(`/tasks/${taskId}/due-date?dueDate=${isoStr}&userId=${currentUserId}`);
             fetchData();
