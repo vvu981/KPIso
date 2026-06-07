@@ -122,26 +122,14 @@ export default function HouseStats({ houseId, members = [], memberStatuses = {} 
 
     // ── Render ───────────────────────────────────────────────────────────────
     return (
-        <section
+        <Card
+            padding="lg"
             style={{
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 'var(--space-6)',
-                padding: 'var(--space-4)',
             }}
         >
-            {/* ── Cabecera con selector de mes ─────────────────────────────── */}
-            <div
-                style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 'var(--space-4)',
-                    flexWrap: 'wrap',
-                }}
-            >
-
-            </div>
-
             {/* ── Estado de carga ──────────────────────────────────────────── */}
             {loading && (
                 <div style={{ textAlign: 'center', padding: 'var(--space-12)', color: 'var(--text-secondary)' }}>
@@ -166,14 +154,7 @@ export default function HouseStats({ houseId, members = [], memberStatuses = {} 
 
             {/* ── Contenido (solo cuando hay datos) ───────────────────────── */}
             {!loading && !error && data && (
-                <Card
-                    padding="lg"
-                    style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 'var(--space-6)',
-                    }}
-                >
+                <>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
                         <h2
                             style={{
@@ -217,6 +198,7 @@ export default function HouseStats({ houseId, members = [], memberStatuses = {} 
                             </select>
                         </div>
                     </div>
+
                     {/* Resumen de Convivientes (Balance y Puntos) */}
                     <div>
                         <h3 style={sectionTitleStyle}>Resumen de Convivientes</h3>
@@ -384,9 +366,9 @@ export default function HouseStats({ houseId, members = [], memberStatuses = {} 
                             <ConvivenciaKpiChart data={kpiData} />
                         </div>
                     </div>
-                </Card>
+                </>
             )}
-        </section>
+        </Card>
     );
 }
 
